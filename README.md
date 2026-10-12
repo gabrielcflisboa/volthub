@@ -100,6 +100,61 @@ cinza = infraestrutura.
 
 Infraestrutura: Kafka 3.9 (KRaft) + Kafka UI, Mosquitto 2, Keycloak 26, Postgres 16, Grafana LGTM (OpenTelemetry Collector, Tempo, Prometheus, Loki).
 
+### `bff-web` — porta de entrada do app
+
+Único serviço que o navegador enxerga. Fica em [`services/bff-web/src`](services/bff-web/src):
+
+- `main.ts` — bootstrap do Fastify e registro das rotas `/api/v1/*`.
+- `auth.ts` — valida o JWT (JWKS do Keycloak) em toda requisição; o PKCE em si é feito "na unha" em `public/app.js`, sem biblioteca.
+- `downstream.ts` — chamadas REST para `station-service`, `reservation-service`, `billing-service` e `charger-simulator`, cada uma com **Circuit Breaker + Retry + Timeout** próprios; o estado dos circuitos é exposto em `/api/v1/resilience`.
+- `realtime.ts` — consome os tópicos Kafka e empurra atualizações para o navegador por **WebSocket** (padrão Observer), alimentando o dashboard em tempo real sem polling.
+- `public/` — o SPA (HTML/CSS/JS puro) servido estaticamente pelo próprio serviço.
+
+Quando um downstream cai, o circuito abre e o BFF responde com dado parcial (`degraded: true`) em vez de propagar o erro — é a degradação graciosa demonstrada em `demo-resiliencia.sh`.
+
+### `station-service` — estações e disponibilidade (Hexagonal + CQRS)
+
+Java 21/Spring Boot em [`services/station-service/src/main/java/com/volthub/station`](services/station-service/src/main/java/com/volthub/station):
+
+- `adapter/in/web` — `StationController` (API REST) e `ApiExceptionHandler`.
+- `adapter/in/messaging` — consumidor Kafka que escuta `charger.status` e atualiza o read model.
+- `adapter/out/persistence` — repositórios JPA (porta de saída implementada).
+- `application/port/{in,out}` — as portas da arquitetura hexagonal (casos de uso de um lado, infraestrutura do outro).
+- `application/service` — implementação dos casos de uso.
+- `domain` — modelo de estação/carregador, sem dependência de framework.
+
+O **CQRS** aparece na tabela `charger_availability`: um read model mantido só por eventos de status (lado da escrita é o cadastro de estações), o que permite ao mapa responder rápido mesmo sob rajada de telemetria.
+
+### `reservation-service` — reservas e ciclo da recarga (Clean Architecture + DDD)
+
+Java 21/Spring Boot em [`services/reservation-service/src/main/java/com/volthub/reservation`](services/reservation-service/src/main/java/com/volthub/reservation):
+
+- `domain/model` — agregado `Reservation` e Value Objects táticos: `HoldPeriod`, `Energy`, `DriverId`, `ChargerRef`, `CancelReason`.
+- `domain/event` e `domain/service` — eventos de domínio e políticas (ex.: `BookingPolicy`).
+- `application/usecase` — `ReservationCommands`/`ReservationQueries` (CQRS de aplicação), `ExpireReservations` (job que expira holds vencidos) e `ChargingSagaHandler`, que reage a `charger.status = FAULTED` **cancelando a reserva e enviando o comando de liberação** — a saga coreografada de compensação.
+- `infrastructure/messaging` — `OutboxMessageFactory` + `OutboxRelay` (Transactional Outbox: o evento é gravado na mesma transação da reserva e publicado depois, sem perder mensagens) e `IntegrationEventsListener` (Idempotent Consumer dos eventos de telemetria/sessão).
+- `infrastructure/{config,http,persistence,web}` — Resilience4j, clientes REST, JPA e controllers.
+
+### `iot-gateway` — ponte MQTT ↔ Kafka
+
+Java 21/Spring Boot em [`services/iot-gateway/src/main/java/com/volthub/gateway`](services/iot-gateway/src/main/java/com/volthub/gateway):
+
+- `mqtt/MqttBridge` — assina os tópicos MQTT dos carregadores e publica comandos recebidos do Kafka de volta para eles.
+- `kafka/ChargerCommandListener` — consome `charger.commands` e traduz para mensagens MQTT.
+- `telemetry/TelemetryTranslator` — **Anti-Corruption Layer**: converte o payload "cru" do carregador no evento de domínio Kafka; payloads inválidos vão para `telemetry.dlq` em vez de derrubar o pipeline (ver `demo-dlq.sh`).
+
+### `billing-service` — faturamento das sessões
+
+Node 22/TS em [`services/billing-service/src`](services/billing-service/src):
+
+- `domain/billing.ts` — regra pura de cálculo (kWh × tarifa), sem dependências de infraestrutura.
+- `application/billing-handler.ts` + `ports.ts` — orquestra o caso de uso a partir dos eventos recebidos.
+- `infrastructure/{kafka,db,station-client,auth,config,metrics}.ts` — consumidor idempotente de `charging.sessions`/`charging.meter`, busca a tarifa no `station-service` autenticando via **OAuth2 Client Credentials**, persiste a fatura e publica o evento `invoices` (outbox simplificado).
+
+### `charger-simulator` — carregadores virtuais
+
+Node 22/TS em [`simulator/src/main.ts`](simulator/src/main.ts): simula 6 carregadores publicando telemetria por MQTT com **QoS 1**, mensagens retidas (o status mais recente fica disponível a quem assina depois) e **Last Will and Testament** (anuncia `OFFLINE` automaticamente se a conexão cair). Expõe uma API HTTP simples (`/chargers`, `/chargers/:id/garbage` para telemetria corrompida, além dos endpoints de fault/repair usados pelas demos).
+
 ## Como subir
 
 **Pré-requisitos:** Docker Desktop com **8 GB de RAM** disponíveis para os containers.
@@ -139,6 +194,22 @@ Parar: `./stop.sh` (mantém dados) ou `./stop.sh --limpar` (apaga tudo).
 | 6 | Trace atravessando HTTP → Outbox → Kafka → MQTT | Grafana → Explore → Tempo |
 | 7 | Kubernetes: self-healing | `k8s/README.md` |
 
+Todos os scripts estão em [`scripts/`](scripts) e usam a API do `bff-web` (`http://localhost:3000`) autenticada
+com um token real do Keycloak — nada é mockado. São idempotentes o suficiente para rodar de novo caso algo falhe.
+
+| Script | O que faz |
+|---|---|
+| `token.sh [email] [senha]` | Obtém um `access_token` via Direct Access Grant (usuário/senha). É usado pelos outros scripts para montar o header `Authorization`; **só serve para automação de laboratório** — o app web de verdade usa Authorization Code + PKCE. |
+| `demo-fluxo-completo.sh [chargerId]` | Reserva um carregador livre, confirma que o mapa mostra `RESERVED`, inicia a recarga, espera a sessão aparecer como `IN_PROGRESS` no dashboard (confirmação chegando por MQTT → Kafka → WebSocket) e, ao final, imprime a fatura gerada (kWh × tarifa × valor). |
+| `demo-compensacao.sh [chargerId]` | Reserva um carregador e, em seguida, simula uma falha nele (`POST /admin/chargers/:id/fault`). Mostra a reserva sendo **cancelada automaticamente** com motivo `CHARGER_FAULT` e o comando de liberação sendo enviado — a saga coreografada de compensação — e depois repara o carregador. |
+| `demo-dlq.sh` | Envia telemetria corrompida de um carregador (`POST /chargers/BH-PUC-01/garbage`) e lê as últimas mensagens do tópico `volthub.telemetry.dlq` no Kafka, provando que o `iot-gateway` isola a mensagem inválida sem travar o restante do fluxo. |
+| `demo-resiliencia.sh` | Derruba o `billing-service` (`docker compose stop`), faz várias chamadas ao dashboard mostrando o circuito do BFF abrindo e a resposta continuando a funcionar em modo degradado, religa o serviço e acompanha o circuito fechar sozinho (`HALF_OPEN → CLOSED`). |
+| `demo-seguranca.sh` | Encadeia chamadas sem token (401), com token adulterado (401), com papel errado (403) e com papel correto (200); ao final, imprime os claims do JWT e obtém um token M2M via `client_credentials` para mostrar a diferença entre papel de usuário e papel de serviço. |
+| `gerar-trafego.sh [minutos]` | Gera carga realista em background por N minutos (padrão 10): dois motoristas reservando/carregando em loop, consultas ao mapa e, periodicamente, uma telemetria inválida e uma falha de carregador — útil para povoar o Grafana com traces e métricas antes de uma demonstração ao vivo. |
+
+A validação de contratos (`validar-asyncapi.mjs`) não é uma demo interativa: roda dentro do CI (ver abaixo) para
+garantir que `docs/asyncapi.yaml` continua um AsyncAPI válido a cada push.
+
 ## Onde está cada conceito da disciplina
 
 | Aula | Conceito | Onde no código |
@@ -176,8 +247,21 @@ cd services/billing-service && npm ci && npm test
 cd services/bff-web && npm ci && npm test   # retry, circuit breaker
 ```
 
-O pipeline `.github/workflows/ci.yml` roda esses testes, valida o AsyncAPI e os manifests Kubernetes
-e faz o build de todas as imagens a cada push.
+## CI/CD
+
+O pipeline [`.github/workflows/ci.yml`](.github/workflows/ci.yml) roda no GitHub Actions a cada `push` em `main`
+e a cada Pull Request, com quatro jobs independentes (os três primeiros rodam em paralelo):
+
+| Job | Estratégia | O que faz |
+|---|---|---|
+| `java` | matrix `[station-service, reservation-service, iot-gateway]`, `fail-fast: false` | Para cada serviço, configura JDK 21 (Temurin) com cache do Maven e roda `mvn verify` — os mesmos testes de domínio que rodam localmente, sem subir Spring, banco ou Kafka. |
+| `node` | matrix `[billing-service, bff-web, simulator]` | Configura Node 22 com cache do npm, roda `npm ci` + `npm run build` (type-check) em todos, e `npm test` só em `billing-service`/`bff-web` (o `simulator` só precisa compilar). |
+| `contracts` | — | Instala o `@asyncapi/parser` e roda `validar-asyncapi.mjs` contra `docs/asyncapi.yaml` (falha o build se houver erro de schema); baixa o `kubeconform` e valida todos os manifests em `k8s/*.yaml` contra o schema oficial do Kubernetes. |
+| `images` | depende de `java` + `node` | Só roda se os testes passarem; builda **todas** as imagens Docker (multi-stage) com `docker compose build`, garantindo que os `Dockerfile` de cada serviço continuam funcionando. A publicação no GHCR está comentada no arquivo, pronta para habilitar quando o repositório for para produção. |
+
+`fail-fast: false` nas matrizes garante que a falha de um serviço não cancela os testes dos demais — útil para ver,
+num único run, todos os serviços que quebraram. Cada matriz usa cache de dependências (Maven/npm) por serviço,
+chaveado no respectivo `pom.xml`/`package-lock.json`, para acelerar runs subsequentes.
 
 ## Estrutura
 
@@ -195,6 +279,6 @@ volthub/
 ├── simulator/                ← Node/TS · carregadores MQTT
 ├── k8s/                      ← manifests Kubernetes
 ├── docs/                     ← AsyncAPI, ADRs, diagramas C4
-├── scripts/                  ← demos
-└── .github/workflows/        ← CI
+├── scripts/                  ← demos, geração de tráfego, token de auth e validação de contratos
+└── .github/workflows/        ← CI (Java, Node, contratos, imagens Docker)
 ```
