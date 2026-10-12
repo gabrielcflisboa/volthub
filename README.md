@@ -7,6 +7,26 @@ reserva, chega, libera a recarga pelo app e acompanha os kWh em tempo real. No f
 Os carregadores são equipamentos IoT que falam **MQTT**. Os serviços conversam por **Kafka** e **REST**,
 e o navegador recebe atualizações por **WebSocket**.
 
+## O que cada módulo faz
+
+Em termos de negócio, sem entrar em tecnologia ou padrão de projeto — cada módulo cuida de uma parte
+bem definida da jornada do motorista:
+
+- **`bff-web`** é a recepção do app: é por onde o motorista e o operador acessam tudo pelo navegador. Ele
+  conversa com os módulos de trás e devolve uma resposta única e já organizada para a tela.
+- **`station-service`** é o catálogo dos eletropostos: sabe quais estações existem, onde ficam, quantos
+  carregadores cada uma tem e se cada um está livre, reservado, em uso ou com defeito.
+- **`reservation-service`** é quem cuida do agendamento: garante que só uma pessoa reserve um carregador
+  por vez, controla o prazo da reserva, acompanha o início e o fim da recarga e cancela a reserva
+  automaticamente se o carregador apresentar defeito.
+- **`iot-gateway`** é o tradutor entre o mundo físico e o digital: recebe os sinais que vêm dos
+  carregadores (reais ou simulados) e os transforma em algo que o resto do sistema entende, e também
+  manda comandos de volta para os carregadores.
+- **`billing-service`** é o financeiro: quando uma recarga termina, calcula quantos kWh foram
+  consumidos, aplica a tarifa da estação e gera a fatura do motorista.
+- **`charger-simulator`** é o "parque de carregadores" usado para testar e demonstrar o sistema sem
+  precisar de hardware real: simula vários carregadores se comportando como equipamentos de verdade.
+
 ## Arquitetura
 
 ```mermaid
