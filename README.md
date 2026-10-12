@@ -182,6 +182,10 @@ chmod +x start.sh stop.sh scripts/*.sh
 
 Parar: `./stop.sh` (mantém dados) ou `./stop.sh --limpar` (apaga tudo).
 
+> **Nota:** `start.sh`/`stop.sh` controlam só o Docker Compose. A pasta [`k8s/`](k8s) é um ambiente
+> **independente e opcional**, subido manualmente com `./k8s/deploy.sh` num cluster minikube/kind —
+> veja [`k8s/README.md`](k8s/README.md).
+
 ## Roteiro da demonstração
 
 | # | O que mostrar | Como |
@@ -192,7 +196,7 @@ Parar: `./stop.sh` (mantém dados) ou `./stop.sh --limpar` (apaga tudo).
 | 4 | DLQ: telemetria corrompida não trava o fluxo | `./scripts/demo-dlq.sh` |
 | 5 | Circuit breaker abrindo e fechando | `./scripts/demo-resiliencia.sh` |
 | 6 | Trace atravessando HTTP → Outbox → Kafka → MQTT | Grafana → Explore → Tempo |
-| 7 | Kubernetes: self-healing | `k8s/README.md` |
+| 7 | Kubernetes: self-healing (fora do Compose, cluster separado) | `./k8s/deploy.sh` e `k8s/README.md` |
 
 Todos os scripts estão em [`scripts/`](scripts) e usam a API do `bff-web` (`http://localhost:3000`) autenticada
 com um token real do Keycloak — nada é mockado. São idempotentes o suficiente para rodar de novo caso algo falhe.
