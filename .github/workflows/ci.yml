@@ -1,0 +1,84 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  java:
+    name: Java · ${{ matrix.service }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [station-service, reservation-service, iot-gateway]
+    defaults:
+      run:
+        working-directory: services/${{ matrix.service }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+          cache-dependency-path: services/${{ matrix.service }}/pom.xml
+      - name: Testes (domínio, sem banco nem Kafka)
+        run: mvn -B -ntp verify
+
+  node:
+    name: Node · ${{ matrix.service }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { service: services/billing-service, test: true }
+          - { service: services/bff-web, test: true }
+          - { service: simulator, test: false }
+    defaults:
+      run:
+        working-directory: ${{ matrix.service }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: ${{ matrix.service }}/package-lock.json
+      - run: npm ci
+      - name: Type-check e build
+        run: npm run build
+      - name: Testes
+        if: matrix.test
+        run: npm test
+
+  contracts:
+    name: Contratos (AsyncAPI e Kubernetes)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Valida AsyncAPI
+        run: |
+          npm i --no-save --prefix scripts @asyncapi/parser@3.4.0
+          node scripts/validar-asyncapi.mjs docs/asyncapi.yaml
+      - name: Valida manifests Kubernetes
+        run: |
+          curl -sSL https://github.com/yannh/kubeconform/releases/download/v0.6.7/kubeconform-linux-amd64.tar.gz | tar xz kubeconform
+          ./kubeconform -strict -summary k8s/*.yaml
+
+  images:
+    name: Imagens Docker
+    needs: [java, node]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build de todas as imagens (multi-stage)
+        run: docker compose build
+      # Publicação no registry (GHCR) entraria aqui, só na branch main:
+      #   docker login ghcr.io -u ${{ github.actor }} -p ${{ secrets.GITHUB_TOKEN }}
+      #   docker compose push

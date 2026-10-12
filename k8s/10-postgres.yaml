@@ -1,0 +1,70 @@
+# Postgres de laboratório (1 réplica). Em produção: serviço gerenciado (RDS, Cloud SQL) ou operator.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: postgres-credentials
+  namespace: volthub
+type: Opaque
+stringData:
+  POSTGRES_USER: volthub
+  POSTGRES_PASSWORD: volthub
+  STATION_DB_PASSWORD: station_pw
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-init
+  namespace: volthub
+data:
+  init.sql: |
+    CREATE USER station_user WITH PASSWORD 'station_pw';
+    CREATE SCHEMA station AUTHORIZATION station_user;
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+  namespace: volthub
+spec:
+  serviceName: postgres
+  replicas: 1
+  selector:
+    matchLabels: { app: postgres }
+  template:
+    metadata:
+      labels: { app: postgres }
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          ports: [{ containerPort: 5432 }]
+          env:
+            - { name: POSTGRES_DB, value: volthub }
+          envFrom:
+            - secretRef: { name: postgres-credentials }
+          readinessProbe:
+            exec: { command: ["pg_isready", "-U", "volthub"] }
+            periodSeconds: 5
+          resources:
+            requests: { cpu: 100m, memory: 128Mi }
+            limits: { memory: 512Mi }
+          volumeMounts:
+            - { name: data, mountPath: /var/lib/postgresql/data }
+            - { name: init, mountPath: /docker-entrypoint-initdb.d }
+      volumes:
+        - name: init
+          configMap: { name: postgres-init }
+  volumeClaimTemplates:
+    - metadata: { name: data }
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources: { requests: { storage: 1Gi } }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: volthub
+spec:
+  selector: { app: postgres }
+  ports: [{ port: 5432 }]

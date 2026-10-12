@@ -1,0 +1,41 @@
+server:
+  port: 8080
+spring:
+  application:
+    name: station-service
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/volthub}
+    username: ${DB_USER:station_user}
+    password: ${DB_PASSWORD:station_pw}
+  flyway:
+    schemas: station
+    default-schema: station
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9094}
+    consumer:
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+  threads:
+    virtual:
+      enabled: true
+
+volthub:
+  oidc:
+    issuer: ${OIDC_ISSUER:http://localhost:8081/realms/volthub}
+    jwks-uri: ${OIDC_JWKS_URI:http://localhost:8081/realms/volthub/protocol/openid-connect/certs}
+    audiences: bff-web,station-service
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+logging:
+  pattern:
+    level: "%5p [trace=%X{trace_id:-} span=%X{span_id:-}]"

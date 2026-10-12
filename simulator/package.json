@@ -1,0 +1,24 @@
+{
+  "name": "charger-simulator",
+  "version": "1.0.0",
+  "description": "Simula os carregadores físicos da rede VoltHub falando MQTT (status, sessão, medidor e comandos)",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/main.js",
+    "dev": "tsx watch src/main.ts"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "fastify": "^5.12.5",
+    "mqtt": "^5.16.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "tsx": "^4.23.15",
+    "typescript": "5.8"
+  }
+}

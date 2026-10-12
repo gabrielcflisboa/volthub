@@ -1,0 +1,147 @@
+{
+  "realm": "volthub",
+  "enabled": true,
+  "displayName": "VoltHub",
+  "accessTokenLifespan": 900,
+  "sslRequired": "none",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "roles": {
+    "realm": [
+      { "name": "driver", "description": "Motorista: reserva carregadores e acompanha a recarga" },
+      { "name": "operator", "description": "Operador da rede: cadastra estações e vê o faturamento" },
+      { "name": "service", "description": "Chamada máquina-a-máquina entre serviços" }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "volthub-web",
+      "name": "VoltHub Web (SPA)",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "implicitFlowEnabled": false,
+      "serviceAccountsEnabled": false,
+      "redirectUris": ["http://localhost:3000/*"],
+      "webOrigins": ["http://localhost:3000"],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "http://localhost:3000/*"
+      },
+      "protocolMappers": [
+        {
+          "name": "audience-bff-web",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.client.audience": "bff-web",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "bff-web",
+      "name": "BFF Web (resource server)",
+      "publicClient": false,
+      "bearerOnly": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false
+    },
+    {
+      "clientId": "station-service",
+      "name": "Station Service (resource server)",
+      "publicClient": false,
+      "bearerOnly": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false
+    },
+    {
+      "clientId": "billing-service",
+      "name": "Billing Service (M2M)",
+      "publicClient": false,
+      "secret": "billing-service-secret",
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "protocolMappers": [
+        {
+          "name": "audience-station-service",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.client.audience": "station-service",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "reservation-service",
+      "name": "Reservation Service (M2M)",
+      "publicClient": false,
+      "secret": "reservation-service-secret",
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "protocolMappers": [
+        {
+          "name": "audience-station-service",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.client.audience": "station-service",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        }
+      ]
+    }
+  ],
+  "users": [
+    {
+      "username": "motorista@volthub.com",
+      "email": "motorista@volthub.com",
+      "firstName": "Ana",
+      "lastName": "Motorista",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [{ "type": "password", "value": "motorista123", "temporary": false }],
+      "realmRoles": ["driver"]
+    },
+    {
+      "username": "motorista2@volthub.com",
+      "email": "motorista2@volthub.com",
+      "firstName": "Bruno",
+      "lastName": "Motorista",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [{ "type": "password", "value": "motorista123", "temporary": false }],
+      "realmRoles": ["driver"]
+    },
+    {
+      "username": "operador@volthub.com",
+      "email": "operador@volthub.com",
+      "firstName": "Carla",
+      "lastName": "Operadora",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [{ "type": "password", "value": "operador123", "temporary": false }],
+      "realmRoles": ["operator"]
+    },
+    {
+      "username": "service-account-billing-service",
+      "enabled": true,
+      "serviceAccountClientId": "billing-service",
+      "realmRoles": ["service"]
+    },
+    {
+      "username": "service-account-reservation-service",
+      "enabled": true,
+      "serviceAccountClientId": "reservation-service",
+      "realmRoles": ["service"]
+    }
+  ]
+}

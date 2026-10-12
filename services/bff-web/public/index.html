@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>VoltHub</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><span class="bolt">⚡</span> VoltHub</div>
+    <div id="user" class="user"></div>
+  </header>
+
+  <main id="app">
+    <section id="login" class="center hidden">
+      <div class="card login-card">
+        <h1>Recarga de veículos elétricos</h1>
+        <p class="muted">Encontre um carregador livre, reserve e acompanhe a recarga em tempo real.</p>
+        <button id="btn-login" class="primary">Entrar com Keycloak</button>
+        <p class="hint">Login com <b>Authorization Code + PKCE</b> (client público, sem secret).<br>
+          Motorista: <code>motorista@volthub.com</code> / <code>motorista123</code><br>
+          Operador: <code>operador@volthub.com</code> / <code>operador123</code></p>
+      </div>
+    </section>
+
+    <div id="degraded" class="banner hidden"></div>
+
+    <!-- Visão do motorista -->
+    <section id="driver" class="hidden">
+      <div class="grid">
+        <div>
+          <h2>Estações</h2>
+          <div id="stations" class="stations"></div>
+        </div>
+        <aside>
+          <h2>Minha recarga</h2>
+          <div id="active" class="card"></div>
+          <h2>Faturas</h2>
+          <div id="invoices" class="card"></div>
+        </aside>
+      </div>
+    </section>
+
+    <!-- Visão do operador -->
+    <section id="operator" class="hidden">
+      <h2>Rede de carregadores</h2>
+      <div id="op-stations" class="card"></div>
+      <div class="grid two">
+        <div>
+          <h2>Receita por estação</h2>
+          <div id="op-report" class="card"></div>
+        </div>
+        <div>
+          <h2>Resiliência (circuit breakers do BFF)</h2>
+          <div id="op-resilience" class="card"></div>
+        </div>
+      </div>
+      <h2>Últimas faturas</h2>
+      <div id="op-invoices" class="card"></div>
+    </section>
+  </main>
+
+  <div id="toasts" class="toasts"></div>
+  <script type="module" src="/app.js"></script>
+</body>
+</html>

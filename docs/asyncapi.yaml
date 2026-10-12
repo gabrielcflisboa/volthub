@@ -1,0 +1,234 @@
+asyncapi: 3.0.0
+info:
+  title: VoltHub — eventos de integração
+  version: 1.0.0
+  description: |
+    Contrato dos eventos trocados entre os serviços do VoltHub (Kafka) e entre os carregadores e o
+    iot-gateway (MQTT). Todo evento Kafka usa o mesmo envelope (EventEnvelope); o que muda é `data`.
+
+    Regras do contrato:
+    - Entrega "pelo menos uma vez": todo consumidor deve ser idempotente usando `eventId`.
+    - A chave da mensagem garante ordem por entidade (chargerId ou reservationId).
+    - Evolução compatível: campo novo é sempre opcional; remover ou renomear campo é breaking change
+      e exige um novo eventType (ex.: reservation.confirmed.v2).
+
+servers:
+  kafka:
+    host: kafka:9092
+    protocol: kafka
+    description: Barramento interno entre serviços
+  mqtt:
+    host: mosquitto:1883
+    protocol: mqtt
+    description: Rede dos carregadores (IoT)
+
+channels:
+  chargerStatus:
+    address: volthub.charger.status
+    servers: [{ $ref: '#/servers/kafka' }]
+    description: Status físico do carregador. Chave = chargerId.
+    messages:
+      chargerStatusChanged: { $ref: '#/components/messages/ChargerStatusChanged' }
+  chargerCommands:
+    address: volthub.charger.commands
+    servers: [{ $ref: '#/servers/kafka' }]
+    description: Comandos de negócio para o carregador (o iot-gateway entrega via MQTT). Chave = chargerId.
+    messages:
+      chargerCommand: { $ref: '#/components/messages/ChargerCommand' }
+  chargingSessions:
+    address: volthub.charging.sessions
+    servers: [{ $ref: '#/servers/kafka' }]
+    description: Início e fim das sessões de recarga. Chave = chargerId.
+    messages:
+      sessionStarted: { $ref: '#/components/messages/SessionStarted' }
+      sessionEnded: { $ref: '#/components/messages/SessionEnded' }
+  chargingMeter:
+    address: volthub.charging.meter
+    servers: [{ $ref: '#/servers/kafka' }]
+    description: Leituras do medidor a cada 2 s durante a recarga. Chave = chargerId.
+    messages:
+      meterValues: { $ref: '#/components/messages/MeterValues' }
+  reservations:
+    address: volthub.reservations
+    servers: [{ $ref: '#/servers/kafka' }]
+    description: Ciclo de vida da reserva (fatos publicados pelo reservation-service via Outbox). Chave = reservationId.
+    messages:
+      reservationConfirmed: { $ref: '#/components/messages/ReservationConfirmed' }
+      reservationLifecycle: { $ref: '#/components/messages/ReservationLifecycle' }
+  invoices:
+    address: volthub.invoices
+    servers: [{ $ref: '#/servers/kafka' }]
+    description: Faturas emitidas. Chave = driverId.
+    messages:
+      invoiceIssued: { $ref: '#/components/messages/InvoiceIssued' }
+  telemetryDlq:
+    address: volthub.telemetry.dlq
+    servers: [{ $ref: '#/servers/kafka' }]
+    description: Dead Letter Queue — telemetria MQTT que falhou na validação do gateway.
+    messages:
+      invalidTelemetry: { $ref: '#/components/messages/InvalidTelemetry' }
+  mqttChargerTelemetry:
+    address: 'volthub/chargers/{chargerId}/{channel}'
+    servers: [{ $ref: '#/servers/mqtt' }]
+    description: Publicado pelo carregador. channel = status (retained, com Last Will OFFLINE) | session | meter.
+    parameters:
+      chargerId: { description: 'Id do carregador, ex. BH-SAV-01' }
+      channel: { enum: [status, session, meter] }
+    messages:
+      mqttTelemetry: { $ref: '#/components/messages/MqttTelemetry' }
+  mqttChargerCommands:
+    address: 'volthub/chargers/{chargerId}/commands'
+    servers: [{ $ref: '#/servers/mqtt' }]
+    parameters:
+      chargerId: { description: Id do carregador }
+    messages:
+      mqttCommand: { $ref: '#/components/messages/MqttCommand' }
+
+operations:
+  publishChargerStatus:   { action: send,    channel: { $ref: '#/channels/chargerStatus' },    summary: 'iot-gateway publica' }
+  consumeChargerStatus:   { action: receive, channel: { $ref: '#/channels/chargerStatus' },    summary: 'station-service (read model), reservation-service (compensação), bff-web (tempo real)' }
+  publishCommands:        { action: send,    channel: { $ref: '#/channels/chargerCommands' },  summary: 'reservation-service publica via Outbox' }
+  consumeCommands:        { action: receive, channel: { $ref: '#/channels/chargerCommands' },  summary: 'iot-gateway entrega via MQTT' }
+  publishSessions:        { action: send,    channel: { $ref: '#/channels/chargingSessions' }, summary: 'iot-gateway publica' }
+  consumeSessions:        { action: receive, channel: { $ref: '#/channels/chargingSessions' }, summary: 'reservation-service, billing-service, bff-web' }
+  publishMeter:           { action: send,    channel: { $ref: '#/channels/chargingMeter' },    summary: 'iot-gateway publica' }
+  consumeMeter:           { action: receive, channel: { $ref: '#/channels/chargingMeter' },    summary: 'billing-service, bff-web' }
+  publishReservations:    { action: send,    channel: { $ref: '#/channels/reservations' },     summary: 'reservation-service publica via Outbox' }
+  consumeReservations:    { action: receive, channel: { $ref: '#/channels/reservations' },     summary: 'station-service, bff-web' }
+  publishInvoices:        { action: send,    channel: { $ref: '#/channels/invoices' },         summary: 'billing-service publica' }
+  consumeInvoices:        { action: receive, channel: { $ref: '#/channels/invoices' },         summary: 'bff-web' }
+
+components:
+  schemas:
+    EventEnvelope:
+      type: object
+      required: [eventId, eventType, occurredAt, source, data]
+      properties:
+        eventId: { type: string, format: uuid, description: Chave de idempotência }
+        eventType: { type: string, example: reservation.confirmed }
+        occurredAt: { type: string, format: date-time }
+        source: { type: string, example: reservation-service }
+        data: { type: object }
+    ChargerStatusData:
+      type: object
+      required: [chargerId, status]
+      properties:
+        chargerId: { type: string, example: BH-SAV-01 }
+        status: { type: string, enum: [AVAILABLE, CHARGING, FAULTED, OFFLINE] }
+    ChargerCommandData:
+      type: object
+      required: [chargerId, command, reservationId]
+      properties:
+        chargerId: { type: string }
+        command: { type: string, enum: [RESERVE, START, RELEASE] }
+        reservationId: { type: string, format: uuid }
+        driverId: { type: string }
+    SessionData:
+      type: object
+      required: [chargerId, sessionId]
+      properties:
+        chargerId: { type: string }
+        sessionId: { type: string }
+        reservationId: { type: [string, 'null'], format: uuid }
+        driverId: { type: [string, 'null'] }
+        energyKwh: { type: number, minimum: 0, description: Somente em session-ended }
+        reason: { type: string, enum: [COMPLETED, FAULT], description: Somente em session-ended }
+    MeterData:
+      type: object
+      required: [chargerId, sessionId, energyKwh, powerKw]
+      properties:
+        chargerId: { type: string }
+        sessionId: { type: string }
+        energyKwh: { type: number, minimum: 0, description: Acumulado da sessão }
+        powerKw: { type: number, minimum: 0 }
+    ReservationData:
+      type: object
+      required: [reservationId, chargerId]
+      properties:
+        reservationId: { type: string, format: uuid }
+        driverId: { type: string }
+        chargerId: { type: string }
+        stationId: { type: string }
+        expiresAt: { type: string, format: date-time }
+        sessionId: { type: string }
+        energyKwh: { type: number }
+        reason: { type: string, enum: [DRIVER_REQUEST, CHARGER_FAULT] }
+    InvoiceData:
+      type: object
+      required: [invoiceId, sessionId, chargerId, stationId, energyKwh, pricePerKwh, amount, currency]
+      properties:
+        invoiceId: { type: string, format: uuid }
+        sessionId: { type: string }
+        driverId: { type: [string, 'null'] }
+        chargerId: { type: string }
+        stationId: { type: string }
+        energyKwh: { type: number }
+        pricePerKwh: { type: number }
+        amount: { type: number }
+        currency: { type: string, const: BRL }
+
+  messages:
+    ChargerStatusChanged:
+      name: charger.status-changed
+      payload:
+        allOf: [{ $ref: '#/components/schemas/EventEnvelope' }, { properties: { data: { $ref: '#/components/schemas/ChargerStatusData' } } }]
+    ChargerCommand:
+      name: charger.command
+      payload:
+        allOf: [{ $ref: '#/components/schemas/EventEnvelope' }, { properties: { data: { $ref: '#/components/schemas/ChargerCommandData' } } }]
+    SessionStarted:
+      name: charging.session-started
+      payload:
+        allOf: [{ $ref: '#/components/schemas/EventEnvelope' }, { properties: { data: { $ref: '#/components/schemas/SessionData' } } }]
+    SessionEnded:
+      name: charging.session-ended
+      payload:
+        allOf: [{ $ref: '#/components/schemas/EventEnvelope' }, { properties: { data: { $ref: '#/components/schemas/SessionData' } } }]
+    MeterValues:
+      name: charging.meter-values
+      payload:
+        allOf: [{ $ref: '#/components/schemas/EventEnvelope' }, { properties: { data: { $ref: '#/components/schemas/MeterData' } } }]
+    ReservationConfirmed:
+      name: reservation.confirmed
+      payload:
+        allOf: [{ $ref: '#/components/schemas/EventEnvelope' }, { properties: { data: { $ref: '#/components/schemas/ReservationData' } } }]
+    ReservationLifecycle:
+      name: reservation.*
+      summary: reservation.start-requested | in-progress | completed | cancelled | expired
+      payload:
+        allOf: [{ $ref: '#/components/schemas/EventEnvelope' }, { properties: { data: { $ref: '#/components/schemas/ReservationData' } } }]
+    InvoiceIssued:
+      name: invoice.issued
+      payload:
+        allOf: [{ $ref: '#/components/schemas/EventEnvelope' }, { properties: { data: { $ref: '#/components/schemas/InvoiceData' } } }]
+    InvalidTelemetry:
+      name: telemetry.invalid
+      payload:
+        type: object
+        properties:
+          mqttTopic: { type: string }
+          reason: { type: string }
+          payload: { type: string, description: Conteúdo original, sem alteração }
+    MqttTelemetry:
+      name: mqtt.telemetry
+      payload:
+        type: object
+        description: Formato enxuto do dispositivo; validado e traduzido pelo iot-gateway (Anti-Corruption Layer)
+        properties:
+          status: { type: string }
+          type: { type: string, enum: [STARTED, ENDED] }
+          sessionId: { type: string }
+          reservationId: { type: string }
+          driverId: { type: string }
+          energyKwh: { type: number }
+          powerKw: { type: number }
+          ts: { type: string, format: date-time }
+    MqttCommand:
+      name: mqtt.command
+      payload:
+        type: object
+        properties:
+          command: { type: string, enum: [RESERVE, START, RELEASE] }
+          reservationId: { type: string }
+          driverId: { type: string }
+          commandId: { type: string }

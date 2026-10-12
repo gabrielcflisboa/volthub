@@ -1,0 +1,88 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: station-service-config
+  namespace: volthub
+data:
+  DB_URL: jdbc:postgresql://postgres:5432/volthub
+  DB_USER: station_user
+  KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+  OIDC_ISSUER: http://localhost:8081/realms/volthub
+  OIDC_JWKS_URI: http://keycloak:8080/realms/volthub/protocol/openid-connect/certs
+  JAVA_TOOL_OPTIONS: "-XX:MaxRAMPercentage=75"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: station-service
+  namespace: volthub
+  labels: { app: station-service, app.kubernetes.io/part-of: volthub }
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: { maxUnavailable: 0, maxSurge: 1 }   # deploy sem downtime
+  selector:
+    matchLabels: { app: station-service }
+  template:
+    metadata:
+      labels: { app: station-service }
+    spec:
+      securityContext: { runAsNonRoot: true, runAsUser: 10001 }
+      containers:
+        - name: station-service
+          image: volthub/station-service:1.0.0
+          imagePullPolicy: IfNotPresent
+          ports: [{ name: http, containerPort: 8080 }]
+          envFrom:
+            - configMapRef: { name: station-service-config }
+          env:
+            - name: DB_PASSWORD
+              valueFrom: { secretKeyRef: { name: postgres-credentials, key: STATION_DB_PASSWORD } }
+          # Spring Boot expõe os probes em /actuator/health/{liveness,readiness}
+          startupProbe:
+            httpGet: { path: /actuator/health/liveness, port: http }
+            periodSeconds: 5
+            failureThreshold: 36       # até 3 min para subir a JVM
+          livenessProbe:
+            httpGet: { path: /actuator/health/liveness, port: http }
+            periodSeconds: 10
+            failureThreshold: 3        # travou → kubelet reinicia o container (self-healing)
+          readinessProbe:
+            httpGet: { path: /actuator/health/readiness, port: http }
+            periodSeconds: 5           # não pronto → sai do Service, não recebe tráfego
+          resources:
+            requests: { cpu: 250m, memory: 384Mi }
+            limits: { memory: 768Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: station-service
+  namespace: volthub
+spec:
+  selector: { app: station-service }
+  ports: [{ name: http, port: 80, targetPort: http }]
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: station-service
+  namespace: volthub
+spec:
+  scaleTargetRef: { apiVersion: apps/v1, kind: Deployment, name: station-service }
+  minReplicas: 2
+  maxReplicas: 5
+  metrics:
+    - type: Resource
+      resource: { name: cpu, target: { type: Utilization, averageUtilization: 70 } }
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: station-service
+  namespace: volthub
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels: { app: station-service }

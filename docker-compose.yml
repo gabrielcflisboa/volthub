@@ -1,0 +1,214 @@
+name: volthub
+
+# VoltHub — rede de recarga de veículos elétricos
+# Sobe tudo com:  ./start.sh   (ou: docker compose up -d --build)
+
+x-otel-env: &otel-env
+  OTEL_EXPORTER_OTLP_ENDPOINT: http://lgtm:4318
+  OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+  OTEL_METRICS_EXPORTER: otlp
+  OTEL_LOGS_EXPORTER: otlp
+  OTEL_TRACES_EXPORTER: otlp
+  OTEL_METRIC_EXPORT_INTERVAL: "10000"
+  OTEL_METRIC_EXPORT_TIMEOUT: "5000"
+  # Node: usa as convenções semânticas estáveis de HTTP (mesmo nome de métrica que o Java)
+  OTEL_SEMCONV_STABILITY_OPT_IN: http
+
+x-kafka-env: &kafka-env
+  KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+  KAFKAJS_NO_PARTITIONER_WARNING: "1"
+
+x-oidc-env: &oidc-env
+  # Emissor que aparece no token (o navegador fala com localhost:8081)
+  OIDC_ISSUER: http://localhost:8081/realms/volthub
+  # De dentro da rede Docker, as chaves públicas e o token endpoint ficam em keycloak:8080
+  OIDC_JWKS_URI: http://keycloak:8080/realms/volthub/protocol/openid-connect/certs
+  OIDC_TOKEN_URI: http://keycloak:8080/realms/volthub/protocol/openid-connect/token
+
+services:
+  # ───────────────────────── Infraestrutura ─────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: volthub
+      POSTGRES_PASSWORD: volthub
+      POSTGRES_DB: volthub
+    ports: ["5432:5432"]
+    volumes:
+      - ./infra/postgres/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U volthub"]
+      interval: 5s
+      retries: 20
+
+  kafka:
+    image: apache/kafka:3.9.1
+    ports: ["9094:9094"]
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093,EXTERNAL://:9094
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,EXTERNAL://localhost:9094
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_NUM_PARTITIONS: 3
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list >/dev/null 2>&1"]
+      interval: 5s
+      retries: 30
+
+  kafka-init:
+    image: apache/kafka:3.9.1
+    depends_on:
+      kafka: { condition: service_healthy }
+    volumes:
+      - ./infra/kafka/create-topics.sh:/create-topics.sh:ro
+    entrypoint: ["/bin/bash", "/create-topics.sh"]
+    restart: "no"
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:v0.7.2
+    ports: ["8090:8080"]
+    environment:
+      KAFKA_CLUSTERS_0_NAME: volthub
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+    depends_on:
+      kafka: { condition: service_healthy }
+
+  mosquitto:
+    image: eclipse-mosquitto:2.0.20
+    ports: ["1883:1883", "9001:9001"]
+    volumes:
+      - ./infra/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+
+  keycloak:
+    image: keycloak/keycloak:26.0.7
+    command: ["start-dev", "--import-realm"]
+    ports: ["8081:8080"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
+      KC_DB_USERNAME: volthub
+      KC_DB_PASSWORD: volthub
+      # Emissor fixo: o token tem o mesmo "iss" para o navegador e para os serviços
+      KC_HOSTNAME: http://localhost:8081
+      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
+      KC_HEALTH_ENABLED: "true"
+    volumes:
+      - ./infra/keycloak/volthub-realm.json:/opt/keycloak/data/import/volthub-realm.json:ro
+    depends_on:
+      postgres: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/9000 && echo -e 'GET /health/ready HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && grep -q UP <&3"]
+      interval: 10s
+      retries: 30
+
+  # Grafana + Loki (logs) + Tempo (traces) + Prometheus/Mimir (métricas) + OTel Collector
+  lgtm:
+    image: grafana/otel-lgtm:0.8.1
+    ports: ["3001:3000", "4317:4317", "4318:4318"]
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
+    volumes:
+      - ./infra/grafana/dashboards.yaml:/otel-lgtm/grafana/conf/provisioning/dashboards/volthub.yaml:ro
+      - ./infra/grafana/dashboards:/otel-lgtm/volthub-dashboards:ro
+
+  # ───────────────────────── Serviços (Java) ─────────────────────────
+  station-service:
+    build: ./services/station-service
+    ports: ["8001:8080"]
+    environment:
+      <<: [*otel-env, *kafka-env, *oidc-env]
+      OTEL_SERVICE_NAME: station-service
+      DB_URL: jdbc:postgresql://postgres:5432/volthub
+      DB_USER: station_user
+      DB_PASSWORD: station_pw
+    depends_on:
+      postgres: { condition: service_healthy }
+      kafka-init: { condition: service_completed_successfully }
+      keycloak: { condition: service_healthy }
+
+  reservation-service:
+    build: ./services/reservation-service
+    ports: ["8002:8080"]
+    environment:
+      <<: [*otel-env, *kafka-env, *oidc-env]
+      OTEL_SERVICE_NAME: reservation-service
+      # Os jobs agendados (outbox relay, expiração) não geram trace próprio a cada execução
+      OTEL_INSTRUMENTATION_SPRING_SCHEDULING_ENABLED: "false"
+      DB_URL: jdbc:postgresql://postgres:5432/volthub
+      DB_USER: reservation_user
+      DB_PASSWORD: reservation_pw
+      STATION_SERVICE_URL: http://station-service:8080
+      OIDC_CLIENT_ID: reservation-service
+      OIDC_CLIENT_SECRET: reservation-service-secret
+      RESERVATION_HOLD_MINUTES: "10"
+    depends_on:
+      postgres: { condition: service_healthy }
+      kafka-init: { condition: service_completed_successfully }
+      keycloak: { condition: service_healthy }
+
+  iot-gateway:
+    build: ./services/iot-gateway
+    ports: ["8003:8080"]
+    environment:
+      <<: [*otel-env, *kafka-env]
+      OTEL_SERVICE_NAME: iot-gateway
+      MQTT_URL: tcp://mosquitto:1883
+    depends_on:
+      mosquitto: { condition: service_started }
+      kafka-init: { condition: service_completed_successfully }
+
+  # ───────────────────────── Serviços (Node/TypeScript) ─────────────────────────
+  billing-service:
+    build: ./services/billing-service
+    ports: ["8004:8080"]
+    environment:
+      <<: [*otel-env, *kafka-env, *oidc-env]
+      OTEL_SERVICE_NAME: billing-service
+      DATABASE_URL: postgres://billing_user:billing_pw@postgres:5432/volthub
+      STATION_SERVICE_URL: http://station-service:8080
+      OIDC_CLIENT_ID: billing-service
+      OIDC_CLIENT_SECRET: billing-service-secret
+    depends_on:
+      postgres: { condition: service_healthy }
+      kafka-init: { condition: service_completed_successfully }
+      keycloak: { condition: service_healthy }
+
+  bff-web:
+    build: ./services/bff-web
+    ports: ["3000:8080"]
+    environment:
+      <<: [*otel-env, *kafka-env, *oidc-env]
+      OTEL_SERVICE_NAME: bff-web
+      OIDC_AUDIENCE: bff-web
+      STATION_SERVICE_URL: http://station-service:8080
+      RESERVATION_SERVICE_URL: http://reservation-service:8080
+      BILLING_SERVICE_URL: http://billing-service:8080
+      SIMULATOR_URL: http://charger-simulator:8080
+      KEYCLOAK_PUBLIC_URL: http://localhost:8081
+    depends_on:
+      kafka-init: { condition: service_completed_successfully }
+      keycloak: { condition: service_healthy }
+
+  charger-simulator:
+    build: ./simulator
+    ports: ["8005:8080"]
+    environment:
+      MQTT_URL: mqtt://mosquitto:1883
+      SESSION_SECONDS: "40"
+    depends_on:
+      mosquitto: { condition: service_started }
+
+volumes:
+  pgdata:
