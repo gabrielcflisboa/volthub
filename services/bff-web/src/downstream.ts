@@ -43,6 +43,9 @@ export class Downstream {
       errorThresholdPercentage: 50,
       volumeThreshold: 5,
       resetTimeout: 15_000,
+      // GET com retry pode levar ~8s por chamada quando o serviço está fora (3 tentativas x 2.5s + backoff).
+      // A janela padrão do opossum (10s) deixaria essas falhas "expirarem" antes de somar o volumeThreshold.
+      rollingCountTimeout: 60_000,
       // Erro 4xx é resposta legítima do serviço (ex.: 409 regra de negócio), não sinal de que ele está doente.
       errorFilter: (err: unknown) => err instanceof UpstreamError && err.status < 500,
     });
