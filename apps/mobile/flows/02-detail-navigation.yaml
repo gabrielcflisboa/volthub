@@ -2,6 +2,9 @@
 appId: com.volthub.mobile
 ---
 - launchApp
+# o app abre na aba Mapa (rota "/"); a lista fica na aba Estações
+- tapOn:
+    id: "tab-stations"
 - extendedWaitUntil:
     visible:
       id: "item-list-screen"

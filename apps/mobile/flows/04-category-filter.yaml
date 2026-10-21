@@ -3,6 +3,9 @@
 appId: com.volthub.mobile
 ---
 - launchApp
+# o app abre na aba Mapa (rota "/"); a lista fica na aba Estações
+- tapOn:
+    id: "tab-stations"
 - extendedWaitUntil:
     visible:
       id: "item-list-screen"
@@ -11,11 +14,16 @@ appId: com.volthub.mobile
     element:
       id: "item-card-volthub-cidade-nova"
     direction: DOWN
+    timeout: 60000
 - tapOn:
     id: "category-chip-available"
 - extendedWaitUntil:
     notVisible:
       id: "item-card-volthub-cidade-nova"
     timeout: 10000
-- assertVisible:
-    id: "item-card-volthub-savassi"
+# a lista mantém o offset de rolagem após filtrar; Savassi (1º item) fica acima
+- scrollUntilVisible:
+    element:
+      id: "item-card-volthub-savassi"
+    direction: UP
+    timeout: 60000

@@ -1,7 +1,12 @@
 # Feature 5 — favoritos persistidos localmente
 appId: com.volthub.mobile
 ---
-- launchApp
+# clearState: favoritos ficam no AsyncStorage; sem isso o toggle desfavorita na 2ª execução
+- launchApp:
+    clearState: true
+# o app abre na aba Mapa (rota "/"); a lista fica na aba Estações
+- tapOn:
+    id: "tab-stations"
 - extendedWaitUntil:
     visible:
       id: "item-list-screen"
