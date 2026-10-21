@@ -12,6 +12,10 @@ export class DomainValidationError extends AppError {
 
 export class NetworkError extends AppError {
   readonly code = 'NETWORK_ERROR';
+  /** Status HTTP quando o servidor respondeu; ausente quando não houve resposta (offline, timeout). */
+  constructor(message: string, cause?: unknown, public readonly status?: number) {
+    super(message, cause);
+  }
 }
 
 export class NotFoundError extends AppError {

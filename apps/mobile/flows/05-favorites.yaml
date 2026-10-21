@@ -4,7 +4,7 @@ appId: com.volthub.mobile
 # clearState: favoritos ficam no AsyncStorage; sem isso o toggle desfavorita na 2ª execução
 - launchApp:
     clearState: true
-# o app abre na aba Mapa (rota "/"); a lista fica na aba Estações
+- runFlow: subflows/login.yaml
 - tapOn:
     id: "tab-stations"
 - extendedWaitUntil:

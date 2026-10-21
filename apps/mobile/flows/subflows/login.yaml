@@ -1,0 +1,14 @@
+# Passa pela tela de login com as credenciais de demonstração (pré-preenchidas).
+# Sem BFF o app entra em modo offline; com BFF autentica de verdade.
+appId: com.volthub.mobile
+---
+- extendedWaitUntil:
+    visible:
+      id: "login-screen"
+    timeout: 30000
+- tapOn:
+    id: "login-submit"
+- extendedWaitUntil:
+    visible:
+      id: "tab-stations"
+    timeout: 30000

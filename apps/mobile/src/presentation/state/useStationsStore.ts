@@ -43,11 +43,7 @@ export const useStationsStore = create<StationsState>((set, get) => ({
 
   fetchStations: async (refresh = false) => {
     set({ loading: !refresh, refreshing: refresh, error: null });
-    let token = useAuthStore.getState().user?.token;
-    if (!token) {
-      const ok = await useAuthStore.getState().login();
-      if (ok) token = useAuthStore.getState().user?.token;
-    }
+    const token = useAuthStore.getState().user?.token || undefined;
     const res = await getStationsUseCase.execute({ token });
     if (res.ok) {
       const stations = res.value;

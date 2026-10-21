@@ -49,7 +49,8 @@ export const apiClient = {
         return Result.err(
           new NetworkError(
             data?.title || data?.message || `Requisição falhou com status ${response.status}`,
-            data
+            data,
+            response.status
           )
         );
       }

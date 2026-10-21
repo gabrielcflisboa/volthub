@@ -1,4 +1,5 @@
 import { Result } from '@/core/types/Result';
+import { AuthenticationError, NetworkError } from '@/core/errors/AppError';
 import { User } from '@/domain/entities/User';
 import { IAuthRepository, LoginCredentials } from '@/domain/repositories/IAuthRepository';
 import { apiClient } from '../api/apiClient';
@@ -22,9 +23,17 @@ export class HttpAuthRepository implements IAuthRepository {
     const res = await apiClient.request<LoginResponseDto>('/api/v1/auth/login', {
       method: 'POST',
       body: credentials ?? {},
+      timeoutMs: 5000,
     });
 
-    if (!res.ok) return res;
+    if (!res.ok) {
+      // O servidor respondeu 400/401: credenciais recusadas (diferente de servidor fora do ar, que fica sem status)
+      const status = res.error instanceof NetworkError ? res.error.status : undefined;
+      if (status === 400 || status === 401) {
+        return Result.err(new AuthenticationError('E-mail ou senha inválidos', res.error));
+      }
+      return res;
+    }
 
     const u = res.value;
     const user = new User({

@@ -77,11 +77,7 @@ export const useLiveChargingStore = create<LiveSessionState>((set, get) => ({
   degradedServices: [],
 
   fetchDashboardInvoices: async () => {
-    let token = useAuthStore.getState().user?.token;
-    if (!token) {
-      const ok = await useAuthStore.getState().login();
-      if (ok) token = useAuthStore.getState().user?.token;
-    }
+    const token = useAuthStore.getState().user?.token;
     if (!token) return;
 
     const res = await getDriverDashboardUseCase.execute(token);
@@ -171,13 +167,8 @@ export const useLiveChargingStore = create<LiveSessionState>((set, get) => ({
       });
     }, 1000);
 
-    // Tenta autenticar e criar reserva real + WebSocket no BFF se disponível
-    let token = useAuthStore.getState().user?.token;
-    if (!token) {
-      const ok = await useAuthStore.getState().login();
-      if (ok) token = useAuthStore.getState().user?.token;
-    }
-
+    // Com sessão real, cria a reserva e abre o WebSocket no BFF; em modo offline segue só com a telemetria local
+    const token = useAuthStore.getState().user?.token;
     if (isStale() || !token) return;
 
     const reservationId = await openChargingSessionUseCase.execute(chargerId, token, isStale);

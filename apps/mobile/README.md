@@ -28,6 +28,7 @@ apps/mobile/src/
 │   └── components/        # Componentes visuais (InteractiveMap, StationCard, ChargerRow, LiveChargingGauge, SearchBar, FilterChips)
 └── app/                   # Rotas Expo Router (File-based routing)
     ├── _layout.tsx        # Navegação em Abas (Mapa, Estações, Recarga Ao Vivo, Favoritos)
+    ├── login.tsx          # Tela de login (obrigatória; abas protegidas por Tabs.Protected)
     ├── index.tsx          # Mapa Interativo de Belo Horizonte com Bottom Card
     ├── stations/
     │   ├── index.tsx      # Lista de Eletropostos com Busca e Filtros
@@ -47,6 +48,7 @@ apps/mobile/src/
 | **3** | **Busca por texto** | `SearchBar` filtra instantaneamente por nome do posto, endereço/bairro ou comodidade via `Station.matchesSearch()` |
 | **4** | **Categoria/filtro estruturado** | `FilterChips` filtra por *Vagas Livres*, *Rápido (>50kW)*, *Plug CCS 2* e *Plug Tipo 2* combinando query params reais na API (`?status=AVAILABLE`, `?fastOnly=true`, `?connector=CCS2`) e `FilterStationsUseCase` |
 | **5** | **Favoritos persistidos localmente** | `LocalStorageFavoritesRepository` persiste o `Set` de IDs favoritos via `AsyncStorage` / `localStorage`, sobrevivendo ao fechamento do app |
+| **★** | **Login obrigatório** | `login.tsx` autentica no `POST /api/v1/auth/login` do BFF (Keycloak). As abas só existem com sessão; botão **Sair** no header. Com o servidor fora do ar, entra em modo offline (dados de demonstração) |
 | **★** | **Mapa + Telemetria Ao Vivo** | Aba **Mapa** com pins georreferenciados e aba **Recarga** com medidor circular em tempo real (conectado ao `POST /api/v1/reservations` e WebSocket `/ws` do BFF) |
 
 ---
@@ -96,3 +98,6 @@ maestro test flows/       # instalar: https://docs.maestro.dev/getting-started/i
 | `04-category-filter` | Chip "Vagas Livres" (`?status=AVAILABLE`) |
 | `05-favorites` | Favoritar, ver na aba e persistir |
 | `06-detail-not-found` | Deep link para estação inexistente mostra estado de erro |
+| `07-login-logout` | App abre no login, entrar libera as abas, sair volta ao login |
+
+Todos os flows começam com `clearState` e passam pelo login via `flows/subflows/login.yaml` (credenciais de demonstração pré-preenchidas).

@@ -18,6 +18,15 @@ export class User {
     this.token = props.token;
   }
 
+  /** Sessão de demonstração usada quando o servidor de autenticação está inalcançável. */
+  static offlineDemo(): User {
+    return new User({ sub: 'offline-demo', name: 'Motorista Offline', roles: ['driver'], token: '' });
+  }
+
+  get isOffline(): boolean {
+    return this.sub === 'offline-demo';
+  }
+
   get isDriver(): boolean {
     return this.roles.includes('driver');
   }

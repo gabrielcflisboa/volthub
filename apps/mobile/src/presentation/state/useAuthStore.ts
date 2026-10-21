@@ -8,6 +8,8 @@ const loginUseCase = new LoginUseCase(authRepository);
 
 interface AuthState {
   user: User | null;
+  /** false até a sessão salva ser lida; evita piscar a tela de login para quem já está autenticado. */
+  initialized: boolean;
   loading: boolean;
   error: string | null;
 
@@ -19,6 +21,7 @@ interface AuthState {
 
 export const useAuthStore = create<AuthState>((set) => ({
   user: null,
+  initialized: false,
   loading: false,
   error: null,
 
@@ -26,9 +29,9 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ loading: true });
     const res = await authRepository.getStoredUser();
     if (res.ok && res.value) {
-      set({ user: res.value, loading: false });
+      set({ user: res.value, loading: false, initialized: true });
     } else {
-      set({ loading: false });
+      set({ loading: false, initialized: true });
     }
   },
 
@@ -46,6 +49,6 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   logout: async () => {
     await authRepository.logout();
-    set({ user: null });
+    set({ user: null, error: null });
   },
 }));

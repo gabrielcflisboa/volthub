@@ -1,8 +1,9 @@
 # Feature 2 — navegação lista → detalhe
 appId: com.volthub.mobile
 ---
-- launchApp
-# o app abre na aba Mapa (rota "/"); a lista fica na aba Estações
+- launchApp:
+    clearState: true
+- runFlow: subflows/login.yaml
 - tapOn:
     id: "tab-stations"
 - extendedWaitUntil:

@@ -1,0 +1,32 @@
+# Login obrigatório — app abre na tela de login; entrar libera as abas; sair volta ao login
+appId: com.volthub.mobile
+---
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible:
+      id: "login-screen"
+    timeout: 30000
+- assertVisible:
+    id: "login-email"
+- assertNotVisible:
+    id: "tab-stations"
+- tapOn:
+    id: "login-submit"
+- extendedWaitUntil:
+    visible:
+      id: "tab-stations"
+    timeout: 30000
+- assertNotVisible:
+    id: "login-screen"
+# a aba Estações não tem header; o botão Sair fica no header das demais abas
+- tapOn:
+    id: "tab-map"
+- tapOn:
+    id: "logout-button"
+- extendedWaitUntil:
+    visible:
+      id: "login-screen"
+    timeout: 10000
+- assertNotVisible:
+    id: "tab-stations"
