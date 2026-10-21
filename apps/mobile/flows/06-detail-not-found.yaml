@@ -1,0 +1,15 @@
+# Regressão — deep link para estação inexistente mostra estado de erro (antes: spinner infinito)
+appId: com.volthub.mobile
+---
+- launchApp
+# espera o JS montar o router; um link enviado antes disso é descartado
+- extendedWaitUntil:
+    visible:
+      id: "tab-stations"
+    timeout: 30000
+- openLink: "volthub://stations/estacao-inexistente"
+- extendedWaitUntil:
+    visible:
+      id: "detail-not-found"
+    timeout: 30000
+- assertVisible: "Estação não encontrada"

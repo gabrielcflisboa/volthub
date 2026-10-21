@@ -21,9 +21,6 @@ appId: com.volthub.mobile
     notVisible:
       id: "item-card-volthub-cidade-nova"
     timeout: 10000
-# a lista mantém o offset de rolagem após filtrar; Savassi (1º item) fica acima
-- scrollUntilVisible:
-    element:
-      id: "item-card-volthub-savassi"
-    direction: UP
-    timeout: 60000
+# ao filtrar a lista volta ao topo, então Savassi (1º item) aparece sem rolar
+- assertVisible:
+    id: "item-card-volthub-savassi"

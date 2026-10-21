@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { View, StyleSheet, FlatList, Text, RefreshControl, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -7,6 +7,7 @@ import { useFavoritesStore } from '@/presentation/state/useFavoritesStore';
 import { SearchBar } from '@/presentation/components/ui/SearchBar';
 import { FilterChips } from '@/presentation/components/ui/FilterChips';
 import { StationCard } from '@/presentation/components/station/StationCard';
+import { Station } from '@/domain/entities/Station';
 import { colors } from '@/presentation/theme/colors';
 import { spacing } from '@/presentation/theme/spacing';
 
@@ -25,6 +26,12 @@ export default function StationsListScreen() {
   } = useStationsStore();
 
   const { isFavorite, toggleFavorite } = useFavoritesStore();
+  const listRef = useRef<FlatList<Station>>(null);
+
+  // Novo filtro/busca muda o conjunto exibido: volta ao topo para os primeiros resultados ficarem visíveis
+  useEffect(() => {
+    listRef.current?.scrollToOffset({ offset: 0, animated: false });
+  }, [activeFilter, searchQuery]);
 
   return (
     <View style={styles.container}>
@@ -47,6 +54,7 @@ export default function StationsListScreen() {
         </View>
       ) : (
         <FlatList
+          ref={listRef}
           testID="item-list-screen"
           data={filteredStations}
           keyExtractor={(item) => item.id}

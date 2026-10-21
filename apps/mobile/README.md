@@ -16,7 +16,7 @@ apps/mobile/src/
 │   ├── value-objects/     # Objetos de Valor com invariantes: Coordinates (Haversine), Money, ConnectorType, ChargerStatus
 │   └── repositories/      # Ports (Contratos/Interfaces): IStationRepository, IFavoritesRepository, IAuthRepository
 ├── application/           # Casos de Uso (Application Business Rules)
-│   └── use-cases/         # GetStationsUseCase, GetStationByIdUseCase, FilterStationsUseCase, ToggleFavoriteStationUseCase, LoginUseCase
+│   └── use-cases/         # GetStationsUseCase, GetStationByIdUseCase, FilterStationsUseCase, ToggleFavoriteStationUseCase, LoginUseCase, OpenChargingSessionUseCase
 ├── infrastructure/        # Adapters de Saída (Implementações concretas de API HTTP, Mappers, Storage)
 │   ├── api/               # apiClient (fetch + timeout), DTOs e FallbackStationsSeed (resiliência offline)
 │   ├── mappers/           # StationMapper (DTO <-> Domain Entity)
@@ -95,3 +95,4 @@ maestro test flows/       # instalar: https://docs.maestro.dev/getting-started/i
 | `03-search` | Busca por texto |
 | `04-category-filter` | Chip "Vagas Livres" (`?status=AVAILABLE`) |
 | `05-favorites` | Favoritar, ver na aba e persistir |
+| `06-detail-not-found` | Deep link para estação inexistente mostra estado de erro |

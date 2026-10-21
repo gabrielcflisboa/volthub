@@ -32,18 +32,32 @@ export default function StationDetailScreen() {
   const [loading, setLoading] = useState(!station);
 
   useEffect(() => {
-    if (id) {
-      fetchStationById(id).then((res) => {
-        if (res) setStation(res);
-        setLoading(false);
-      });
+    if (!id) {
+      setLoading(false);
+      return;
     }
+    fetchStationById(id).then((res) => {
+      if (res) setStation(res);
+      setLoading(false);
+    });
   }, [id]);
 
-  if (loading || !station) {
+  if (!station) {
+    if (loading) {
+      return (
+        <View style={styles.centered}>
+          <ActivityIndicator size="large" color={colors.primary} />
+        </View>
+      );
+    }
+    // Busca terminou sem estação (id inexistente ou API/seed sem ela): não deixa o spinner girando para sempre
     return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" color={colors.primary} />
+      <View testID="detail-not-found" style={styles.centered}>
+        <Ionicons name="alert-circle-outline" size={48} color={colors.textMuted} />
+        <Text style={styles.notFoundTitle}>Estação não encontrada</Text>
+        <Text style={styles.notFoundSubtitle}>
+          Ela pode ter sido removida ou o link está incorreto.
+        </Text>
       </View>
     );
   }
@@ -157,6 +171,19 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: colors.background,
+    paddingHorizontal: spacing.xl,
+  },
+  notFoundTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.textPrimary,
+    marginTop: spacing.md,
+  },
+  notFoundSubtitle: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    marginTop: 4,
   },
   heroContainer: {
     width: '100%',

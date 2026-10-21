@@ -1,13 +1,16 @@
 import { create } from 'zustand';
 import { env } from '@/core/config/env';
 import { Invoice } from '@/domain/entities/Invoice';
-import { apiClient } from '@/infrastructure/api/apiClient';
 import { HttpDashboardRepository } from '@/infrastructure/repositories/HttpDashboardRepository';
+import { HttpReservationRepository } from '@/infrastructure/repositories/HttpReservationRepository';
 import { GetDriverDashboardUseCase } from '@/application/use-cases/GetDriverDashboardUseCase';
+import { OpenChargingSessionUseCase } from '@/application/use-cases/OpenChargingSessionUseCase';
 import { useAuthStore } from './useAuthStore';
 
 const dashboardRepository = new HttpDashboardRepository();
 const getDriverDashboardUseCase = new GetDriverDashboardUseCase(dashboardRepository);
+const reservationRepository = new HttpReservationRepository();
+const openChargingSessionUseCase = new OpenChargingSessionUseCase(reservationRepository);
 
 export interface CompletedInvoice {
   stationName: string;
@@ -46,6 +49,8 @@ export interface LiveSessionState {
 let timer: ReturnType<typeof setInterval> | null = null;
 let ws: WebSocket | null = null;
 let lastWsMeterAt = 0;
+// Incrementado a cada start/stop: um startCharging ainda em voo compara com o seu valor e desiste se ficou obsoleto
+let sessionSeq = 0;
 
 const INITIAL_SOC = 20; // Começa em 20% de bateria
 const TARGET_KWH = 48.0; // 48 kWh para ir de 20% a 100% (bateria de 60 kWh)
@@ -89,6 +94,8 @@ export const useLiveChargingStore = create<LiveSessionState>((set, get) => ({
   },
 
   startCharging: async (stationName, chargerId, powerKw, pricePerKwh) => {
+    const seq = ++sessionSeq;
+    const isStale = () => seq !== sessionSeq;
     if (timer) clearInterval(timer);
     if (ws) {
       ws.close();
@@ -171,100 +178,67 @@ export const useLiveChargingStore = create<LiveSessionState>((set, get) => ({
       if (ok) token = useAuthStore.getState().user?.token;
     }
 
-    if (token) {
-      let resv = await apiClient.request<{ id: string }>('/api/v1/reservations', {
-        method: 'POST',
-        token,
-        body: { chargerId },
-        timeoutMs: 3000,
-      });
+    if (isStale() || !token) return;
 
-      // Se deu 409 Conflict (ex.: motorista já tinha uma reserva ativa anterior), limpa ou reaproveita a reserva ativa
-      if (!resv.ok) {
-        const dash = await apiClient.request<{
-          activeReservation?: { id: string; chargerId: string; status: string } | null;
-        }>('/api/v1/dashboard', { token, timeoutMs: 3000 });
+    const reservationId = await openChargingSessionUseCase.execute(chargerId, token, isStale);
+    if (isStale()) return;
+    if (reservationId) set({ reservationId });
 
-        const active = dash.ok ? dash.value?.activeReservation : null;
-        if (active) {
-          if (active.chargerId === chargerId) {
-            resv = { ok: true, value: { id: active.id } };
-          } else if (active.status === 'CONFIRMED') {
-            await apiClient.request(`/api/v1/reservations/${encodeURIComponent(active.id)}/cancel`, {
-              method: 'POST',
-              token,
-              timeoutMs: 3000,
+    try {
+      ws = new WebSocket(`${env.wsUrl}?access_token=${encodeURIComponent(token)}`);
+      ws.onopen = () => {
+        if (!isStale()) set({ wsConnected: true });
+      };
+      ws.onmessage = (event) => {
+        if (isStale()) return;
+        try {
+          const msg = JSON.parse(event.data);
+          if (msg.type === 'meter' && typeof msg.energyKwh === 'number') {
+            lastWsMeterAt = Date.now();
+            const st = get();
+            set({
+              energyKwh: msg.energyKwh,
+              powerKw: msg.powerKw ?? st.powerKw,
+              batteryPercent: computeBatteryPercent(msg.energyKwh, st.targetKwh),
             });
-            resv = await apiClient.request<{ id: string }>('/api/v1/reservations', {
-              method: 'POST',
-              token,
-              body: { chargerId },
-              timeoutMs: 3000,
-            });
-          }
-        }
-      }
-
-      if (resv.ok && resv.value?.id) {
-        const reservationId = resv.value.id;
-        set({ reservationId });
-        await apiClient.request(`/api/v1/reservations/${encodeURIComponent(reservationId)}/start`, {
-          method: 'POST',
-          token,
-          timeoutMs: 3000,
-        });
-      }
-
-      try {
-        ws = new WebSocket(`${env.wsUrl}?access_token=${encodeURIComponent(token)}`);
-        ws.onopen = () => set({ wsConnected: true });
-        ws.onmessage = (event) => {
-          try {
-            const msg = JSON.parse(event.data);
-            if (msg.type === 'meter' && typeof msg.energyKwh === 'number') {
-              lastWsMeterAt = Date.now();
-              const st = get();
-              set({
-                energyKwh: msg.energyKwh,
-                powerKw: msg.powerKw ?? st.powerKw,
-                batteryPercent: computeBatteryPercent(msg.energyKwh, st.targetKwh),
-              });
-            } else if (msg.type === 'invoice') {
-              if (timer) clearInterval(timer);
-              timer = null;
-              const st = get();
-              const finalKwh = typeof msg.energyKwh === 'number' ? msg.energyKwh : st.energyKwh;
-              const finalAmount =
-                typeof msg.amount === 'number' ? msg.amount : +(finalKwh * st.pricePerKwh).toFixed(2);
-              set({
-                isCharging: false,
-                powerKw: 0,
+          } else if (msg.type === 'invoice') {
+            if (timer) clearInterval(timer);
+            timer = null;
+            const st = get();
+            const finalKwh = typeof msg.energyKwh === 'number' ? msg.energyKwh : st.energyKwh;
+            const finalAmount =
+              typeof msg.amount === 'number' ? msg.amount : +(finalKwh * st.pricePerKwh).toFixed(2);
+            set({
+              isCharging: false,
+              powerKw: 0,
+              energyKwh: finalKwh,
+              batteryPercent: 100,
+              lastInvoice: {
+                stationName: st.stationName,
+                chargerId: st.chargerId,
                 energyKwh: finalKwh,
-                batteryPercent: 100,
-                lastInvoice: {
-                  stationName: st.stationName,
-                  chargerId: st.chargerId,
-                  energyKwh: finalKwh,
-                  pricePerKwh: st.pricePerKwh,
-                  totalAmount: finalAmount,
-                  elapsedSeconds: st.elapsedSeconds,
-                  issuedAt: new Date().toLocaleTimeString('pt-BR'),
-                },
-              });
-              get().fetchDashboardInvoices();
-            }
-          } catch {
-            // Ignora payload malformado
+                pricePerKwh: st.pricePerKwh,
+                totalAmount: finalAmount,
+                elapsedSeconds: st.elapsedSeconds,
+                issuedAt: new Date().toLocaleTimeString('pt-BR'),
+              },
+            });
+            get().fetchDashboardInvoices();
           }
-        };
-        ws.onclose = () => set({ wsConnected: false });
-      } catch {
-        // Segue com telemetria local se WebSocket não conectar
-      }
+        } catch {
+          // Ignora payload malformado
+        }
+      };
+      ws.onclose = () => {
+        if (!isStale()) set({ wsConnected: false });
+      };
+    } catch {
+      // Segue com telemetria local se WebSocket não conectar
     }
   },
 
   stopCharging: async () => {
+    sessionSeq++;
     if (timer) clearInterval(timer);
     timer = null;
     if (ws) {
@@ -276,11 +250,7 @@ export const useLiveChargingStore = create<LiveSessionState>((set, get) => ({
     const { reservationId } = state;
     const token = useAuthStore.getState().user?.token;
     if (reservationId && token) {
-      await apiClient.request(`/api/v1/reservations/${encodeURIComponent(reservationId)}/cancel`, {
-        method: 'POST',
-        token,
-        timeoutMs: 2500,
-      });
+      await reservationRepository.cancel(reservationId, token);
     }
 
     set({
