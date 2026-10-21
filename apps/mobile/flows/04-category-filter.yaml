@@ -1,0 +1,21 @@
+# Feature 4 — filtro estruturado (chip "Vagas Livres" -> ?status=AVAILABLE)
+# No seed, "Cristiano Machado" não tem nenhum carregador livre; "Savassi" tem.
+appId: com.volthub.mobile
+---
+- launchApp
+- extendedWaitUntil:
+    visible:
+      id: "item-list-screen"
+    timeout: 30000
+- scrollUntilVisible:
+    element:
+      id: "item-card-volthub-cidade-nova"
+    direction: DOWN
+- tapOn:
+    id: "category-chip-available"
+- extendedWaitUntil:
+    notVisible:
+      id: "item-card-volthub-cidade-nova"
+    timeout: 10000
+- assertVisible:
+    id: "item-card-volthub-savassi"
