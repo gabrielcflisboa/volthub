@@ -1,8 +1,9 @@
 import React from 'react';
-import { View, Text, StyleSheet, Image, Pressable } from 'react-native';
+import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Station } from '@/domain/entities/Station';
 import { colors } from '../../theme/colors';
+import { StationImage } from './StationImage';
 import { spacing, radii } from '../../theme/spacing';
 
 interface StationCardProps {
@@ -31,7 +32,7 @@ export const StationCard: React.FC<StationCardProps> = ({
       onPress={() => onPress(station)}
     >
       <View style={styles.imageContainer}>
-        <Image source={{ uri: station.imageUrl }} style={styles.image} resizeMode="cover" />
+        <StationImage uri={station.imageUrl} style={styles.image} />
         <View style={styles.imageOverlay} />
 
         {/* Badge de Disponibilidade */}

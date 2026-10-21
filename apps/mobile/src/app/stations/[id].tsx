@@ -4,7 +4,6 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  Image,
   Pressable,
   ActivityIndicator,
 } from 'react-native';
@@ -14,6 +13,7 @@ import { useStationsStore } from '@/presentation/state/useStationsStore';
 import { useFavoritesStore } from '@/presentation/state/useFavoritesStore';
 import { useLiveChargingStore } from '@/presentation/state/useLiveChargingStore';
 import { ChargerRow } from '@/presentation/components/station/ChargerRow';
+import { StationImage } from '@/presentation/components/station/StationImage';
 import { Station } from '@/domain/entities/Station';
 import { Charger } from '@/domain/entities/Charger';
 import { colors } from '@/presentation/theme/colors';
@@ -74,7 +74,7 @@ export default function StationDetailScreen() {
     <ScrollView testID="detail-screen" style={styles.container} contentContainerStyle={styles.content}>
       {/* Imagem de Capa */}
       <View style={styles.heroContainer}>
-        <Image source={{ uri: station.imageUrl }} style={styles.heroImage} resizeMode="cover" />
+        <StationImage uri={station.imageUrl} style={styles.heroImage} iconSize={56} />
         <View style={styles.heroOverlay} />
 
         {/* Botão de Favorito no Canto Superior */}

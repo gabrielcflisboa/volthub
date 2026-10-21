@@ -1,10 +1,11 @@
 import React from 'react';
-import { View, StyleSheet, Text, Image, Pressable } from 'react-native';
+import { View, StyleSheet, Text, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useStationsStore } from '@/presentation/state/useStationsStore';
 import { useFavoritesStore } from '@/presentation/state/useFavoritesStore';
 import { InteractiveMap } from '@/presentation/components/map/InteractiveMap';
+import { StationImage } from '@/presentation/components/station/StationImage';
 import { colors } from '@/presentation/theme/colors';
 import { spacing, radii } from '@/presentation/theme/spacing';
 
@@ -29,11 +30,7 @@ export default function MapScreen() {
             style={styles.bottomCard}
             onPress={() => router.push(`/stations/${selectedStation.id}` as any)}
           >
-            <Image
-              source={{ uri: selectedStation.imageUrl }}
-              style={styles.cardImage}
-              resizeMode="cover"
-            />
+            <StationImage uri={selectedStation.imageUrl} style={styles.cardImage} iconSize={28} />
             <View style={styles.cardDetails}>
               <View style={styles.cardHeader}>
                 <Text style={styles.cardTitle} numberOfLines={1}>
