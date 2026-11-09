@@ -1,0 +1,15 @@
+meta {
+  name: Relatório por Estação
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{billingUrl}}/v1/reports/stations
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{operatorToken}}
+}

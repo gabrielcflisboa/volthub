@@ -1,0 +1,66 @@
+# ═════════════════════════════════════════════════════════════════════════════
+# VoltHub — MODO DEV
+#
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+#
+# Stack ENXUTO (8 containers): o BFF + seus 3 downstreams + Postgres/Kafka/Keycloak.
+# Grafana, Kafka UI, Mosquitto, IoT gateway e simulador ficam no profile "full".
+#
+# Hot reload:
+#   Node (bff-web, billing-service) → volume + tsx watch, salva e reinicia sozinho.
+#   Java (station, reservation)      → "docker compose watch" reconstrói o que você editou.
+#
+# Console (a resposta pra "não vejo console de nada"):
+#   ./scripts/dev.sh logs            → core inteiro, ao vivo, com prefixo do serviço
+#   ./scripts/dev.sh logs bff-web   → só um serviço
+#   ./scripts/dev.sh watch           → terminal 2: rebuild automático do Java
+# ═════════════════════════════════════════════════════════════════════════════
+
+services:
+  # ── Node/TS: hot reload por volume + tsx watch ──
+  bff-web:
+    build:
+      context: ./services/bff-web
+      target: dev
+    working_dir: /src
+    command: ["npx", "tsx", "watch", "src/main.ts"]
+    environment:
+      NODE_ENV: development
+      OTEL_SDK_DISABLED: "true"
+    volumes:
+      - ./services/bff-web/src:/src/src
+      - ./services/bff-web/public:/src/public
+
+  billing-service:
+    build:
+      context: ./services/billing-service
+      target: dev
+    working_dir: /src
+    command: ["npx", "tsx", "watch", "src/main.ts"]
+    environment:
+      NODE_ENV: development
+      OTEL_SDK_DISABLED: "true"
+    volumes:
+      - ./services/billing-service/src:/src/src
+
+  reservation-service:
+    environment:
+      OTEL_SDK_DISABLED: "true"
+    develop:
+      watch:
+        - path: ./services/reservation-service/src
+          action: rebuild
+        - path: ./services/reservation-service/pom.xml
+          action: rebuild
+
+  # ── Fora do grupo padrão: só com --profile full ──
+  lgtm:
+    profiles: ["full"]
+  kafka-ui:
+    profiles: ["full"]
+  mosquitto:
+    profiles: ["full"]
+  iot-gateway:
+    profiles: ["full"]
+  charger-simulator:
+    profiles: ["full"]

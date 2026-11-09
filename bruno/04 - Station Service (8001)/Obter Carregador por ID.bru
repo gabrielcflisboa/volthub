@@ -1,0 +1,11 @@
+meta {
+  name: Obter Carregador por ID
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{stationUrl}}/v1/chargers/{{defaultChargerId}}
+  body: none
+  auth: none
+}

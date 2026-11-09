@@ -37,8 +37,29 @@ public class StationController {
     // ───────────── Queries ─────────────
 
     @GetMapping("/stations")
-    public List<StationResponse> list() {
-        return queries.listStations().stream().map(StationResponse::of).toList();
+    public List<StationResponse> list(
+            @RequestParam(required = false) String connector,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) Boolean fastOnly,
+            @RequestParam(required = false) String q
+    ) {
+        return queries.listStations().stream()
+                .map(StationResponse::of)
+                .filter(s -> connector == null || connector.isBlank()
+                        || s.chargers().stream().anyMatch(c -> c.connector().equalsIgnoreCase(connector)))
+                .filter(s -> status == null || status.isBlank()
+                        || s.chargers().stream().anyMatch(c -> c.status().equalsIgnoreCase(status)))
+                .filter(s -> fastOnly == null || !fastOnly
+                        || s.chargers().stream().anyMatch(c -> c.powerKw() >= 50))
+                .filter(s -> q == null || q.isBlank()
+                        || s.name().toLowerCase().contains(q.toLowerCase())
+                        || (s.address() != null && s.address().toLowerCase().contains(q.toLowerCase())))
+                .toList();
+    }
+
+    @GetMapping("/stations/{stationId}")
+    public StationResponse get(@PathVariable String stationId) {
+        return StationResponse.of(queries.getStation(stationId));
     }
 
     @GetMapping("/chargers/{chargerId}")
@@ -89,12 +110,17 @@ public class StationController {
     }
 
     public record StationResponse(String id, String name, String address, double latitude, double longitude,
-                                  BigDecimal pricePerKwh, long availableChargers, List<ChargerResponse> chargers) {
+                                  BigDecimal pricePerKwh, String imageUrl, BigDecimal rating, String openHours,
+                                  List<String> amenities, long availableChargers, List<ChargerResponse> chargers) {
         static StationResponse of(QueryAvailabilityUseCase.StationView v) {
             Station s = v.station();
             List<ChargerResponse> chargers = v.chargers().stream().map(ChargerResponse::of).toList();
             long available = chargers.stream().filter(c -> c.status().equals("AVAILABLE")).count();
-            return new StationResponse(s.id(), s.name(), s.address(), s.latitude(), s.longitude(), s.pricePerKwh(), available, chargers);
+            List<String> amenitiesList = (s.amenities() != null && !s.amenities().isBlank())
+                    ? List.of(s.amenities().split(","))
+                    : List.of("WIFI", "PARKING");
+            return new StationResponse(s.id(), s.name(), s.address(), s.latitude(), s.longitude(), s.pricePerKwh(),
+                    s.imageUrl(), s.rating(), s.openHours(), amenitiesList, available, chargers);
         }
     }
 }

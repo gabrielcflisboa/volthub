@@ -35,9 +35,10 @@ public class SecurityConfig {
         http.csrf(c -> c.disable())
             .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(a -> a
-                .requestMatchers("/actuator/health/**", "/actuator/info",
+                .requestMatchers("/actuator/health/**", "/actuator/info", "/error",
                         "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                 .requestMatchers(HttpMethod.GET, "/v1/stations/*/tariff").hasAnyRole("service", "operator")
+                .requestMatchers(HttpMethod.GET, "/v1/stations", "/v1/stations/*").permitAll()
                 .requestMatchers(HttpMethod.GET, "/v1/**").authenticated()
                 .requestMatchers("/v1/**").hasRole("operator")
                 .anyRequest().denyAll())

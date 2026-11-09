@@ -1,0 +1,19 @@
+meta {
+  name: Dashboard do Motorista
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{bffUrl}}/api/v1/dashboard
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{driverToken}}
+}
+
+vars:post-response {
+  activeReservationId: res.body.activeReservation ? res.body.activeReservation.id : ''
+}

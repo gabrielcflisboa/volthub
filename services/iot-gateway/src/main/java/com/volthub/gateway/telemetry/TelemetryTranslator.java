@@ -51,7 +51,8 @@ public class TelemetryTranslator {
             case "status" -> {
                 String status = required(body, "status");
                 if (!STATUSES.contains(status)) throw new InvalidTelemetryException("Status desconhecido: " + status);
-                yield message(STATUS_TOPIC, chargerId, "charger.status-changed", ts,
+                // Ordena status pela observação no gateway: o Last Will não traz o horário da queda.
+                yield message(STATUS_TOPIC, chargerId, "charger.status-changed", Instant.now(),
                         data("chargerId", chargerId, "status", status));
             }
             case "session" -> {

@@ -1,0 +1,11 @@
+meta {
+  name: Enviar Telemetria Corrompida (DLQ)
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{simulatorUrl}}/chargers/{{defaultChargerId}}/garbage
+  body: none
+  auth: none
+}

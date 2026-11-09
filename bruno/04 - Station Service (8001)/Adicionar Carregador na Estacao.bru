@@ -1,0 +1,23 @@
+meta {
+  name: Adicionar Carregador na Estação
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{stationUrl}}/v1/stations/{{defaultStationId}}/chargers
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "chargerId": "BH-SAV-03",
+    "connector": "CCS2",
+    "powerKw": 100
+  }
+}

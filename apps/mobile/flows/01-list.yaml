@@ -1,0 +1,21 @@
+# Feature 1 — lista consumindo API real (BFF VoltHub; sem BFF cai no seed local)
+appId: com.volthub.mobile
+---
+- launchApp:
+    clearState: true
+- runFlow: subflows/login.yaml
+- tapOn:
+    id: "tab-stations"
+- extendedWaitUntil:
+    visible:
+      id: "item-list-screen"
+    timeout: 30000
+- assertVisible:
+    id: "item-card-volthub-savassi"
+- scrollUntilVisible:
+    element:
+      id: "item-card-volthub-floresta"
+    direction: DOWN
+    timeout: 60000
+- assertVisible:
+    id: "item-card-volthub-floresta"

@@ -1,0 +1,15 @@
+meta {
+  name: Overview do Operador
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{bffUrl}}/api/v1/admin/overview
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{operatorToken}}
+}

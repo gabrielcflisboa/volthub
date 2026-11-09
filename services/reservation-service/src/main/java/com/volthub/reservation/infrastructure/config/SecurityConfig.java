@@ -35,7 +35,7 @@ public class SecurityConfig {
         http.csrf(c -> c.disable())
             .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(a -> a
-                .requestMatchers("/actuator/health/**", "/actuator/info", "/actuator/circuitbreakers",
+                .requestMatchers("/actuator/health/**", "/actuator/info", "/error", "/actuator/circuitbreakers",
                         "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                 .requestMatchers(HttpMethod.GET, "/v1/reservations/**").hasAnyRole("driver", "operator")
                 .requestMatchers("/v1/reservations/**").hasRole("driver")

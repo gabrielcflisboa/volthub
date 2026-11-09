@@ -5,6 +5,7 @@ import com.volthub.station.application.port.out.AvailabilityReadModel;
 import com.volthub.station.application.port.out.StationRepository;
 import com.volthub.station.domain.ChargerAvailability;
 import com.volthub.station.domain.NotFoundException;
+import com.volthub.station.domain.Station;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -24,6 +25,13 @@ public class AvailabilityQueryService implements QueryAvailabilityUseCase {
         return stations.findAll().stream()
                 .map(s -> new StationView(s, readModel.findByStation(s.id())))
                 .toList();
+    }
+
+    @Override
+    public StationView getStation(String stationId) {
+        Station s = stations.findById(stationId)
+                .orElseThrow(() -> new NotFoundException("Estação não encontrada: " + stationId));
+        return new StationView(s, readModel.findByStation(s.id()));
     }
 
     @Override

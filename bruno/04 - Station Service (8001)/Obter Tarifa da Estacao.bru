@@ -1,0 +1,11 @@
+meta {
+  name: Obter Tarifa da Estação
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{stationUrl}}/v1/stations/{{defaultStationId}}/tariff
+  body: none
+  auth: none
+}

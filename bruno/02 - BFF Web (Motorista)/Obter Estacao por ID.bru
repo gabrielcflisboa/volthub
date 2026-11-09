@@ -1,0 +1,19 @@
+meta {
+  name: Obter Estação por ID
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{bffUrl}}/api/v1/stations/{{defaultStationId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: 
+}
+
+vars:pre-request {
+  defaultStationId: volthub-savassi
+}

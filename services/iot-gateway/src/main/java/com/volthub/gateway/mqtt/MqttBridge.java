@@ -45,7 +45,7 @@ public class MqttBridge implements MqttCallbackExtended {
     private final Tracer tracer = GlobalOpenTelemetry.getTracer("volthub.iot-gateway");
     private final LongCounter received = GlobalOpenTelemetry.getMeter("volthub.iot-gateway")
             .counterBuilder("volthub.mqtt.messages").setDescription("Mensagens MQTT recebidas dos carregadores").build();
-    private MqttClient client;
+    private MqttAsyncClient client;
 
     public MqttBridge(@Value("${volthub.mqtt.url}") String brokerUrl, KafkaTemplate<String, String> kafka, ObjectMapper mapper) {
         this.brokerUrl = brokerUrl;
@@ -56,7 +56,7 @@ public class MqttBridge implements MqttCallbackExtended {
 
     @PostConstruct
     void connect() throws MqttException {
-        client = new MqttClient(brokerUrl, "iot-gateway", new MemoryPersistence());
+        client = new MqttAsyncClient(brokerUrl, "iot-gateway", new MemoryPersistence());
         client.setCallback(this);
         MqttConnectOptions options = new MqttConnectOptions();
         options.setAutomaticReconnect(true);
@@ -68,7 +68,7 @@ public class MqttBridge implements MqttCallbackExtended {
     private void connectWithRetry(MqttConnectOptions options) throws MqttException {
         for (int attempt = 1; ; attempt++) {
             try {
-                client.connect(options);
+                client.connect(options).waitForCompletion();
                 return;
             } catch (MqttException e) {
                 if (attempt >= 30) throw e;
@@ -81,8 +81,22 @@ public class MqttBridge implements MqttCallbackExtended {
     @Override
     public void connectComplete(boolean reconnect, String serverURI) {
         try {
-            client.subscribe(INBOUND, 1);
-            log.info("Conectado ao MQTT {} (reconexão={}), assinando {}", serverURI, reconnect, INBOUND);
+            // O callback precisa retornar para o Paho drenar mensagens retidas e processar o SUBACK.
+            client.subscribe(INBOUND, 1, null, new IMqttActionListener() {
+                @Override
+                public void onSuccess(IMqttToken token) {
+                    if (token.getGrantedQos()[0] == 0x80) {
+                        onFailure(token, new MqttException(MqttException.REASON_CODE_SUBSCRIBE_FAILED));
+                        return;
+                    }
+                    log.info("Conectado ao MQTT {} (reconexão={}), assinando {}", serverURI, reconnect, INBOUND);
+                }
+
+                @Override
+                public void onFailure(IMqttToken token, Throwable cause) {
+                    log.error("Falha ao assinar {}", INBOUND, cause);
+                }
+            });
         } catch (MqttException e) {
             log.error("Falha ao assinar {}", INBOUND, e);
         }
@@ -129,7 +143,7 @@ public class MqttBridge implements MqttCallbackExtended {
     public void publishCommand(String chargerId, byte[] payload) throws MqttException {
         MqttMessage msg = new MqttMessage(payload);
         msg.setQos(1);
-        client.publish("volthub/chargers/" + chargerId + "/commands", msg);
+        client.publish("volthub/chargers/" + chargerId + "/commands", msg).waitForCompletion();
     }
 
     @Override
@@ -142,6 +156,9 @@ public class MqttBridge implements MqttCallbackExtended {
 
     @PreDestroy
     void close() throws MqttException {
-        if (client != null && client.isConnected()) client.disconnect();
+        if (client != null) {
+            if (client.isConnected()) client.disconnect().waitForCompletion();
+            client.close();
+        }
     }
 }

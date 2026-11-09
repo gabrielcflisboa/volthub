@@ -12,6 +12,7 @@ export const config = {
   oidc: {
     issuer: env('OIDC_ISSUER', 'http://localhost:8081/realms/volthub'),
     jwksUri: env('OIDC_JWKS_URI', 'http://localhost:8081/realms/volthub/protocol/openid-connect/certs'),
+    tokenUri: env('OIDC_TOKEN_URI', 'http://localhost:8081/realms/volthub/protocol/openid-connect/token'),
     audience: env('OIDC_AUDIENCE', 'bff-web'),
     publicUrl: env('KEYCLOAK_PUBLIC_URL', 'http://localhost:8081'),
     realm: 'volthub',

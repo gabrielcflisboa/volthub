@@ -17,3 +17,14 @@ COPY package.json ./
 USER node
 EXPOSE 8080
 CMD ["node", "--import", "./dist/telemetry.js", "dist/main.js"]
+
+# ---- dev ----
+FROM node:22-bookworm-slim AS dev
+WORKDIR /src
+ENV NODE_ENV=development
+COPY package.json package-lock.json ./
+RUN npm ci
+COPY tsconfig.json ./
+COPY src ./src
+EXPOSE 8080
+CMD ["npx", "tsx", "watch", "src/main.ts"]

@@ -1,0 +1,25 @@
+# Feature 5 — favoritos persistidos localmente
+appId: com.volthub.mobile
+---
+# clearState: favoritos ficam no AsyncStorage; sem isso o toggle desfavorita na 2ª execução
+- launchApp:
+    clearState: true
+- runFlow: subflows/login.yaml
+- tapOn:
+    id: "tab-stations"
+- extendedWaitUntil:
+    visible:
+      id: "item-list-screen"
+    timeout: 30000
+- tapOn:
+    id: "item-card-volthub-savassi"
+- assertVisible:
+    id: "detail-screen"
+- tapOn:
+    id: "detail-favorite-button"
+- tapOn:
+    id: "detail-back-button"
+- tapOn:
+    id: "tab-favorites"
+- assertVisible:
+    id: "favorite-item-volthub-savassi"

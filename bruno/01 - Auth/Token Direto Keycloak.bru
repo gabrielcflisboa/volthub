@@ -1,0 +1,23 @@
+meta {
+  name: Token Direto Keycloak
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{keycloakUrl}}/realms/volthub/protocol/openid-connect/token
+  body: formUrlEncoded
+  auth: none
+}
+
+body:form-urlencoded {
+  grant_type: password
+  client_id: volthub-web
+  username: motorista@volthub.com
+  password: motorista123
+  scope: openid
+}
+
+vars:post-response {
+  driverToken: res.body.access_token
+}

@@ -1,0 +1,30 @@
+{
+  "expo": {
+    "name": "VoltHub",
+    "slug": "volthub-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "volthub",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#0B0F19"
+      },
+      "package": "com.volthub.mobile"
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single"
+    },
+    "plugins": [
+      "expo-router"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

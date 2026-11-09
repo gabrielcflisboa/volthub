@@ -1,0 +1,27 @@
+# Feature 4 — filtro estruturado (chip "Vagas Livres" -> ?status=AVAILABLE)
+# No seed, "Cristiano Machado" não tem nenhum carregador livre; "Savassi" tem.
+appId: com.volthub.mobile
+---
+- launchApp:
+    clearState: true
+- runFlow: subflows/login.yaml
+- tapOn:
+    id: "tab-stations"
+- extendedWaitUntil:
+    visible:
+      id: "item-list-screen"
+    timeout: 30000
+- scrollUntilVisible:
+    element:
+      id: "item-card-volthub-cidade-nova"
+    direction: DOWN
+    timeout: 60000
+- tapOn:
+    id: "category-chip-available"
+- extendedWaitUntil:
+    notVisible:
+      id: "item-card-volthub-cidade-nova"
+    timeout: 10000
+# ao filtrar a lista volta ao topo, então Savassi (1º item) aparece sem rolar
+- assertVisible:
+    id: "item-card-volthub-savassi"

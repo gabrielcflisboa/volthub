@@ -24,6 +24,7 @@ export function createAuth(opts: { jwksUri: string; issuer: string; audience: st
   async function verify(token: string): Promise<Principal> {
     const { payload } = await jwtVerify(token, jwks, { issuer: opts.issuer, audience: opts.audience });
     const p = payload as typeof payload & { realm_access?: { roles?: string[] }; name?: string; email?: string };
+    console.log(payload);
     return { sub: String(p.sub), name: p.name ?? p.email ?? 'usuário', roles: p.realm_access?.roles ?? [], token };
   }
 
@@ -33,10 +34,22 @@ export function createAuth(opts: { jwksUri: string; issuer: string; audience: st
     try {
       req.principal = await verify(header.slice(7));
     } catch {
+      console.error('Falha ao verificar token JWT', header);
       return reply.code(401).send({ title: 'Token inválido ou expirado' });
     }
     if (role && !req.principal.roles.includes(role)) return reply.code(403).send({ title: `Requer o papel ${role}` });
   };
 
-  return { verify, guard };
+  const optionalGuard = () => async (req: FastifyRequest) => {
+    const header = req.headers.authorization;
+    if (header?.startsWith('Bearer ')) {
+      try {
+        req.principal = await verify(header.slice(7));
+      } catch {
+        // Ignora erro para usuários não autenticados em rotas públicas opcionais
+      }
+    }
+  };
+
+  return { verify, guard, optionalGuard };
 }

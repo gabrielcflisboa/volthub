@@ -65,6 +65,7 @@ export class Downstream {
     const method = o.method ?? 'GET';
     const maxAttempts = method === 'GET' ? 3 : 1;
     let lastErr: unknown;
+    console.log('url: ', this.baseUrl + o.path);
     for (let i = 0; i < maxAttempts; i++) {
       try {
         const res = await fetch(this.baseUrl + o.path, {
@@ -76,6 +77,9 @@ export class Downstream {
           body: o.body !== undefined ? JSON.stringify(o.body) : undefined,
           signal: AbortSignal.timeout(this.timeoutMs),
         });
+        console.log('START:*************************************************************************')
+        console.log('url: ', this.baseUrl + o.path, 'method: ', method, 'status: ', res.status, 'attempt: ', i + 1, '/', maxAttempts);
+        console.log('END*************************************************************************')
         const text = await res.text();
         const parsed = text ? safeJson(text) : null;
         if (!res.ok) {

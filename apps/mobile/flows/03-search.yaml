@@ -1,0 +1,19 @@
+# Feature 3 — busca por texto (client-side)
+appId: com.volthub.mobile
+---
+- launchApp:
+    clearState: true
+- runFlow: subflows/login.yaml
+- tapOn:
+    id: "tab-stations"
+- extendedWaitUntil:
+    visible:
+      id: "item-list-screen"
+    timeout: 30000
+- tapOn:
+    id: "search-input"
+- inputText: "pampulha"
+- assertVisible:
+    id: "item-card-volthub-pampulha"
+- assertNotVisible:
+    id: "item-card-volthub-savassi"

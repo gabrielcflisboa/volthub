@@ -1,0 +1,19 @@
+# Feature 2 — navegação lista → detalhe
+appId: com.volthub.mobile
+---
+- launchApp:
+    clearState: true
+- runFlow: subflows/login.yaml
+- tapOn:
+    id: "tab-stations"
+- extendedWaitUntil:
+    visible:
+      id: "item-list-screen"
+    timeout: 30000
+- tapOn:
+    id: "item-card-volthub-savassi"
+- assertVisible:
+    id: "detail-screen"
+- assertVisible:
+    id: "detail-title"
+- assertVisible: "VoltHub Savassi"

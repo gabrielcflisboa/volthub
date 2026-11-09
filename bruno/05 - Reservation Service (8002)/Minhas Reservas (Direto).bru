@@ -1,0 +1,15 @@
+meta {
+  name: Minhas Reservas (Direto)
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{reservationUrl}}/v1/reservations/me
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{driverToken}}
+}

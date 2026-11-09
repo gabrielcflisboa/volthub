@@ -1,0 +1,18 @@
+meta {
+  name: Listar Estações com Filtros
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{bffUrl}}/api/v1/stations?connector=CCS2&status=AVAILABLE&fastOnly=true&q=Savassi
+  body: none
+  auth: none
+}
+
+params:query {
+  connector: CCS2
+  status: AVAILABLE
+  fastOnly: true
+  q: Savassi
+}

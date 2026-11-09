@@ -5,6 +5,6 @@
 set -euo pipefail
 USER=${1:-motorista@volthub.com}
 PASS=${2:-motorista123}
-curl -s -X POST "http://localhost:8081/realms/volthub/protocol/openid-connect/token" \
+curl -s -X POST "http://localhost:8088/realms/volthub/protocol/openid-connect/token" \
   -d grant_type=password -d client_id=volthub-web -d "username=$USER" -d "password=$PASS" -d scope=openid \
   | sed -E 's/.*"access_token":"([^"]+)".*/\1/'
