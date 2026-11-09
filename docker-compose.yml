@@ -19,8 +19,8 @@ x-kafka-env: &kafka-env
   KAFKAJS_NO_PARTITIONER_WARNING: "1"
 
 x-oidc-env: &oidc-env
-  # Emissor que aparece no token (o navegador fala com localhost:8081)
-  OIDC_ISSUER: http://localhost:8081/realms/volthub
+  # Emissor que aparece no token (o navegador fala com localhost:8088)
+  OIDC_ISSUER: http://localhost:8088/realms/volthub
   # De dentro da rede Docker, as chaves públicas e o token endpoint ficam em keycloak:8080
   OIDC_JWKS_URI: http://keycloak:8080/realms/volthub/protocol/openid-connect/certs
   OIDC_TOKEN_URI: http://keycloak:8080/realms/volthub/protocol/openid-connect/token
@@ -33,7 +33,7 @@ services:
       POSTGRES_USER: volthub
       POSTGRES_PASSWORD: volthub
       POSTGRES_DB: volthub
-    ports: ["5432:5432"]
+    ports: ["5433:5432"]
     volumes:
       - ./infra/postgres/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
       - pgdata:/var/lib/postgresql/data
@@ -91,7 +91,7 @@ services:
   keycloak:
     image: keycloak/keycloak:26.0.7
     command: ["start-dev", "--import-realm"]
-    ports: ["8081:8080"]
+    ports: ["8088:8080"]
     environment:
       KC_BOOTSTRAP_ADMIN_USERNAME: admin
       KC_BOOTSTRAP_ADMIN_PASSWORD: admin
@@ -100,7 +100,7 @@ services:
       KC_DB_USERNAME: volthub
       KC_DB_PASSWORD: volthub
       # Emissor fixo: o token tem o mesmo "iss" para o navegador e para os serviços
-      KC_HOSTNAME: http://localhost:8081
+      KC_HOSTNAME: http://localhost:8088
       KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
       KC_HEALTH_ENABLED: "true"
     volumes:
@@ -196,7 +196,7 @@ services:
       RESERVATION_SERVICE_URL: http://reservation-service:8080
       BILLING_SERVICE_URL: http://billing-service:8080
       SIMULATOR_URL: http://charger-simulator:8080
-      KEYCLOAK_PUBLIC_URL: http://localhost:8081
+      KEYCLOAK_PUBLIC_URL: http://localhost:8088
     depends_on:
       kafka-init: { condition: service_completed_successfully }
       keycloak: { condition: service_healthy }

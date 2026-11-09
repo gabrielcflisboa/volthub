@@ -13,6 +13,8 @@ public interface QueryAvailabilityUseCase {
 
     List<StationView> listStations();
 
+    StationView getStation(String stationId);
+
     ChargerAvailability getCharger(String chargerId);
 
     BigDecimal tariffOf(String stationId);

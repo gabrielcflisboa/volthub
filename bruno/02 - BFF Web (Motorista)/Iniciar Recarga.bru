@@ -1,0 +1,15 @@
+meta {
+  name: Iniciar Recarga
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{bffUrl}}/api/v1/reservations/{{activeReservationId}}/start
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{driverToken}}
+}

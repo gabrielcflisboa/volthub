@@ -1,0 +1,25 @@
+meta {
+  name: Cadastrar Estação
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{stationUrl}}/v1/stations
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "name": "VoltHub Estoril",
+    "address": "Av. Professor Mário Werneck, 1000 - Estoril, Belo Horizonte - MG",
+    "latitude": -19.965,
+    "longitude": -43.968,
+    "pricePerKwh": 2.25
+  }
+}

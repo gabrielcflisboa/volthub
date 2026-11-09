@@ -7,11 +7,24 @@ import com.volthub.reservation.domain.model.Reservation;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
+
+import java.util.Map;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 @RestControllerAdvice
 public class ApiExceptionHandler {
+
+    /** Payload inválido (campo obrigatório em branco) → 400 Bad Request com a lista de violações. */
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ProblemDetail validation(MethodArgumentNotValidException e) {
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, "Payload inválido");
+        pd.setProperty("violations", e.getBindingResult().getFieldErrors().stream()
+                .map(f -> Map.of("field", f.getField(), "message", String.valueOf(f.getDefaultMessage())))
+                .toList());
+        return pd;
+    }
 
     @ExceptionHandler(NotFoundException.class)
     public ProblemDetail notFound(NotFoundException e) {

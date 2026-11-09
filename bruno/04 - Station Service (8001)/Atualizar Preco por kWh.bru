@@ -1,0 +1,21 @@
+meta {
+  name: Atualizar Preço por kWh
+  type: http
+  seq: 7
+}
+
+put {
+  url: {{stationUrl}}/v1/stations/{{defaultStationId}}/price
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "pricePerKwh": 2.49
+  }
+}

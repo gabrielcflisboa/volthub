@@ -27,7 +27,16 @@ interface Charger {
 }
 
 const chargers: Charger[] = [
-  ['BH-SAV-01', 60], ['BH-SAV-02', 22], ['BH-PAM-01', 120], ['BH-PAM-02', 22], ['BH-PUC-01', 11], ['BH-PUC-02', 50],
+  ['BH-SAV-01', 60], ['BH-SAV-02', 22],
+  ['BH-PAM-01', 120], ['BH-PAM-02', 22],
+  ['BH-PUC-01', 11], ['BH-PUC-02', 50],
+  ['BH-LOU-01', 150], ['BH-LOU-02', 22],
+  ['BH-BEL-01', 150], ['BH-BEL-02', 50], ['BH-BEL-03', 22],
+  ['BH-MAN-01', 60], ['BH-MAN-02', 22],
+  ['BH-CNF-01', 180], ['BH-CNF-02', 120], ['BH-CNF-03', 22],
+  ['BH-NOV-01', 50], ['BH-NOV-02', 11],
+  ['BH-BUR-01', 60], ['BH-BUR-02', 22],
+  ['BH-FLO-01', 50], ['BH-FLO-02', 22],
 ].map(([id, powerKw]) => ({ id: String(id), powerKw: Number(powerKw), status: 'AVAILABLE', reservationId: null, driverId: null, session: null }));
 
 const topic = (c: Charger, channel: string) => `volthub/chargers/${c.id}/${channel}`;

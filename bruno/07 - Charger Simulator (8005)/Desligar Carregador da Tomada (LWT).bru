@@ -1,0 +1,11 @@
+meta {
+  name: Desligar Carregador da Tomada (LWT)
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{simulatorUrl}}/chargers/{{defaultChargerId}}/unplug
+  body: none
+  auth: none
+}

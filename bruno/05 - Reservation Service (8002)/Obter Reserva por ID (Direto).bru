@@ -1,0 +1,15 @@
+meta {
+  name: Obter Reserva por ID (Direto)
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{reservationUrl}}/v1/reservations/{{activeReservationId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{driverToken}}
+}

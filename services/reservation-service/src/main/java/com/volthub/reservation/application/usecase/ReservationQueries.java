@@ -17,7 +17,7 @@ public class ReservationQueries {
     }
 
     public Reservation get(String reservationId, String driverId, boolean isOperator) {
-        Reservation r = reservations.findById(new ReservationId(reservationId))
+        Reservation r = reservations.findByIdForRead(new ReservationId(reservationId))
                 .orElseThrow(() -> new NotFoundException("Reserva não encontrada: " + reservationId));
         if (!isOperator && !r.driver().value().equals(driverId)) throw new Reservation.NotOwnerException();
         return r;

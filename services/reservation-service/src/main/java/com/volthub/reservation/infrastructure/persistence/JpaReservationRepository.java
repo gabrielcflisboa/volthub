@@ -55,6 +55,11 @@ public class JpaReservationRepository implements ReservationRepository {
     }
 
     @Override
+    public Optional<Reservation> findByIdForRead(ReservationId id) {
+        return jpa.findById(id.value()).map(JpaReservationRepository::toDomain);
+    }
+
+    @Override
     public List<Reservation> findByDriver(DriverId driver) {
         return jpa.findByDriverIdOrderByStartsAtDesc(driver.value()).stream().map(JpaReservationRepository::toDomain).toList();
     }

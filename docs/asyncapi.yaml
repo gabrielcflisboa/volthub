@@ -26,7 +26,9 @@ channels:
   chargerStatus:
     address: volthub.charger.status
     servers: [{ $ref: '#/servers/kafka' }]
-    description: Status físico do carregador. Chave = chargerId.
+    description: >-
+      Status físico do carregador. Chave = chargerId. occurredAt é o horário de observação no gateway
+      para ordenar também os avisos Last Will sem ts; sessões e medidores mantêm o horário do dispositivo.
     messages:
       chargerStatusChanged: { $ref: '#/components/messages/ChargerStatusChanged' }
   chargerCommands:

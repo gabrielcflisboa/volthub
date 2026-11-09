@@ -1,0 +1,15 @@
+meta {
+  name: Reparar Carregador
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{bffUrl}}/api/v1/admin/chargers/{{defaultChargerId}}/repair
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{operatorToken}}
+}

@@ -1,0 +1,15 @@
+meta {
+  name: Detalhes da Sessão
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{billingUrl}}/v1/sessions/sess-12345678
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{driverToken}}
+}

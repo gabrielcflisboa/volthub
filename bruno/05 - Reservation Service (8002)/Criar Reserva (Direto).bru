@@ -1,0 +1,34 @@
+meta {
+  name: Criar Reserva (Direto)
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{reservationUrl}}/v1/reservations
+  body: json
+  auth: bearer
+}
+
+headers {
+  Content-Type: application/json
+}
+
+auth:bearer {
+  token: {{driverToken}}
+}
+
+body:json {
+  {
+    "chargerId": "{{defaultChargerId}}"
+  }
+}
+
+vars:pre-request {
+  defaultChargerId: BH-CNF-01
+  reservationUrl: http://localhost:8002
+}
+
+vars:post-response {
+  activeReservationId: res.body.id
+}

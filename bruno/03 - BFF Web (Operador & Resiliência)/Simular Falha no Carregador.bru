@@ -1,0 +1,15 @@
+meta {
+  name: Simular Falha no Carregador
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{bffUrl}}/api/v1/admin/chargers/{{defaultChargerId}}/fault
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{operatorToken}}
+}

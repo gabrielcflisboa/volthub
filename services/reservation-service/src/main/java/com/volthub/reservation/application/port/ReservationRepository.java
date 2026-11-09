@@ -15,6 +15,9 @@ import java.util.Optional;
 public interface ReservationRepository {
     void save(Reservation reservation);
     Optional<Reservation> findById(ReservationId id);
+
+    /** Leitura sem lock: pode rodar fora de transação (usado pelo lado de consulta). */
+    Optional<Reservation> findByIdForRead(ReservationId id);
     List<Reservation> findByDriver(DriverId driver);
     boolean driverHasActive(DriverId driver);
     boolean chargerHasActive(String chargerId);
